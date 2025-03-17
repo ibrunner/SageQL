@@ -11,7 +11,7 @@
 
 1. establish graphql connection with source that has introspection
 
-- Select a source that has a public graphql API with introspection. For the purposes of a POC we should pick something simple like the star wars database used for graphql documentation
+- Select a source that has a public graphql API with introspection. For the purposes of a POC we should pick something simple like the spacex
 - create config files for API connection config - env files, example env files, etc
 - create script to retrieve introspection query including all info and types
 - script should save query response to a file. this file will be read from the app, use a file format optimized for this
