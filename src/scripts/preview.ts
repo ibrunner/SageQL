@@ -1,13 +1,13 @@
 import { config } from "dotenv";
 import {
   ALL_SAMPLE_PROMPTS,
-  loadIntrospectionSchema,
   generateChatMessages,
   type ChatMessage,
   parseChatOptions,
   handlePromptSelection,
   logChatOutput,
 } from "../lib/chat.js";
+import { loadLatestSchema } from "../lib/schema.js";
 
 // Load environment variables
 config();
@@ -42,7 +42,7 @@ async function main() {
     return;
   }
 
-  const schema = await loadIntrospectionSchema();
+  const schema = await loadLatestSchema();
   const messages = generateChatMessages(selectedPrompt.prompt, schema);
   previewChat(messages);
 

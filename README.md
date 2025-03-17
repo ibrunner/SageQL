@@ -1,63 +1,38 @@
 # SageQL
 
-A tool for interacting with GraphQL APIs using natural language.
+A natural language to GraphQL query generator using LangChain and LangGraph.
 
-## Scripts
+## Features
 
-### Preview Chat Messages
+- Natural language to GraphQL query generation
+- Schema-aware query validation
+- Automatic query execution
+- Built-in error handling and retry logic
+- Support for complex nested queries
+- Integration with OpenAI's GPT models
 
-Preview the messages that would be sent to the language model without making actual API calls:
+## Project Structure
 
-```bash
-yarn preview [options]
 ```
-
-Options:
-
-- `--list`: List all available prompts
-- `--prompt=<name>`: Use a specific prompt by name
-- `--verbose`: Show additional debug information
-- `--log`: Save the preview output to a JSON file in `outputs/preview/`
-
-### Chat with GraphQL API
-
-Interact with the GraphQL API using natural language:
-
-```bash
-yarn chat [options]
+/
+├── /src
+│   ├── /agents
+│   │   ├── /query-builder    # Query generation agent
+│   │   └── graph.ts         # LangGraph orchestration
+│   ├── /tools
+│   │   ├── graphql-executor.ts  # GraphQL execution tool
+│   │   └── query-validator.ts   # Query validation tool
+│   ├── /scripts
+│   │   ├── introspect.ts    # Schema introspection
+│   │   ├── chat.ts         # Basic chat interface
+│   │   ├── preview.ts      # Preview generated queries
+│   │   └── query.ts        # Query generation script
+│   └── /lib
+│       └── /utils          # Utility functions
+├── /outputs
+│   └── schema.json         # Introspected GraphQL schema
+└── package.json
 ```
-
-Options:
-
-- `--list`: List all available prompts
-- `--prompt=<name>`: Use a specific prompt by name
-- `--verbose`: Show additional debug information
-- `--log`: Save the chat output to a JSON file in `outputs/chat/`
-
-## Output Files
-
-When using the `--log` flag, the following output files will be created:
-
-### Preview Outputs
-
-Located in `outputs/preview/`:
-
-- Format: `preview-YYYY-MM-DDTHH-mm-ss-mmmZ.json`
-- Contains: Messages that would be sent to the language model
-
-### Chat Outputs
-
-Located in `outputs/chat/`:
-
-- Format: `chat-YYYY-MM-DDTHH-mm-ss-mmmZ.json`
-- Contains: Messages sent to the language model and the response received
-
-Each output file includes:
-
-- Timestamp of the interaction
-- Messages sent to the language model
-- Response from the language model (for chat outputs only)
-- Metadata about the model and API configuration used
 
 ## Setup
 
@@ -66,91 +41,92 @@ Each output file includes:
    ```bash
    yarn install
    ```
-3. Copy the example environment file and fill in your OpenAI API key:
+3. Copy `.env.example` to `.env` and fill in your environment variables:
    ```bash
    cp .env.example .env
    ```
-4. Edit `.env` and add your OpenAI API key:
-   ```
-   OPENAI_API_KEY=your_key_here
+4. Run the introspection script to fetch the GraphQL schema:
+   ```bash
+   yarn introspect
    ```
 
 ## Usage
 
-### Running the Chat Script
+### Query Generation
 
-The chat script can be run in several ways:
+Generate and execute GraphQL queries from natural language:
 
-1. Run with a random sample prompt:
+```bash
+yarn query "Show me all launches with their mission names and crew members"
+```
 
-   ```bash
-   yarn chat
-   ```
+The script will:
 
-2. Run with verbose output:
+1. Generate a GraphQL query from your natural language request
+2. Validate the query against the schema
+3. Execute the query and return results
 
-   ```bash
-   yarn chat --verbose
-   ```
+### Chat Interface
 
-3. List available prompts:
+For interactive query generation:
 
-   ```bash
-   yarn chat --list
-   ```
+```bash
+yarn chat
+```
 
-4. Run a specific prompt by name:
-   ```bash
-   yarn chat --prompt="Main Entities"
-   ```
+### Preview Queries
 
-### Available Prompts
+Preview generated queries without executing them:
 
-The script includes several pre-defined prompts for testing different aspects of the GraphQL API:
+```bash
+yarn preview "Show me all launches with their mission names and crew members"
+```
 
-#### Schema Understanding
+## Environment Variables
 
-- Main Entities: Lists and describes the main entities in the API
-- Type Structure: Shows available fields on the Character type
-- Relationships: Explains how characters are related to other entities
-
-#### Query Generation
-
-- Character Query: Generates a query for Luke Skywalker's information
-- Planet List: Creates a query for all planets
-- Film Details: Generates a query for Episode IV details
+- `OPENAI_API_KEY`: Your OpenAI API key
+- `GRAPHQL_API_URL`: The URL of your GraphQL API
+- `MODEL_NAME`: (Optional) The OpenAI model to use (defaults to gpt-4-turbo-preview)
 
 ## Development
 
-### Project Structure
+### Adding New Features
 
-```
-/
-├── /src
-│   ├── /graphql
-│   │   └── schema.json        # GraphQL introspection schema
-│   ├── /scripts
-│   │   ├── /prompts          # Sample prompts for testing
-│   │   ├── chat.ts          # Main chat script
-│   │   └── introspect.ts    # Schema introspection script
-│   └── /lib                 # Shared utilities
-├── .env.example            # Example environment variables
-└── package.json
-```
+1. Create new agents in `/src/agents`
+2. Add new tools in `/src/tools`
+3. Update the LangGraph orchestration in `graph.ts`
+4. Add new scripts in `/src/scripts`
 
-### Adding New Prompts
+### Testing
 
-To add new prompts, create a new file in `src/scripts/prompts/` and export an array of prompt objects with the following structure:
-
-```typescript
-{
-  name: string; // Display name of the prompt
-  prompt: string; // The actual prompt text
-  expected: string; // Description of expected output
-}
+```bash
+yarn typecheck  # Type checking
+yarn lint      # Linting
+yarn format    # Code formatting
 ```
 
-Then import and add the prompts to the `ALL_SAMPLE_PROMPTS` array in `chat.ts`.
+## Architecture
+
+The system uses a LangGraph-based architecture with specialized agents:
+
+1. **Query Builder Agent**: Generates GraphQL queries from natural language
+2. **Query Validator**: Validates queries against the schema
+3. **GraphQL Executor**: Executes validated queries
+
+The workflow is orchestrated by a LangGraph that:
+
+- Handles state management
+- Implements retry logic for failed validations
+- Manages the flow between agents
+- Provides error handling and recovery
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 

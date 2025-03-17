@@ -1,6 +1,5 @@
 import { config } from "dotenv";
 import {
-  loadIntrospectionSchema,
   generateChatMessages,
   parseChatOptions,
   handlePromptSelection,
@@ -9,6 +8,7 @@ import {
   createChatClient,
   chatWithClient,
 } from "../lib/chat.js";
+import { loadLatestSchema } from "../lib/schema.js";
 
 // Load environment variables
 config();
@@ -19,7 +19,7 @@ const chatClient = createChatClient();
 async function chat(prompt: string, verbose = false) {
   try {
     // Load the introspection schema
-    const schema = await loadIntrospectionSchema();
+    const schema = await loadLatestSchema();
     const messages = generateChatMessages(prompt, schema);
 
     if (verbose) {
@@ -51,7 +51,7 @@ async function main() {
     return;
   }
 
-  const schema = await loadIntrospectionSchema();
+  const schema = await loadLatestSchema();
   const messages = generateChatMessages(selectedPrompt.prompt, schema);
   const response = await chat(selectedPrompt.prompt, options.verbose);
 

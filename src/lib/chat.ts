@@ -6,8 +6,10 @@ import {
   existsSync,
 } from "fs";
 import { join } from "path";
+import { GraphQLSchema } from "graphql";
 import { schemaUnderstandingPrompts } from "../scripts/prompts/schema-understanding.js";
 import { queryGenerationPrompts } from "../scripts/prompts/query-generation.js";
+import { loadLatestSchema } from "./schema.js";
 
 // System prompt for the AI
 export const SYSTEM_PROMPT = `You are an AI assistant specialized in helping users interact with GraphQL APIs.

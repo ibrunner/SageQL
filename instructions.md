@@ -34,8 +34,13 @@
 
 3. query generation tool
 
-- create a tool that the AI script can call to generate graphQL queries
-- create a special system prompt telling the AI that it is a tool to generate graphql queries
-- integrate the tool calling into our primary chat bot. evaluate sample scripts to include uses that would require tool calling
-- add logging
-- add a step to validate the query before it is returned, include retry logic if validation fails
+- create a tool that the AI script can call to process graphQL queries - actually hitting the api
+- create an agent to generate queries based on unstructured requests, for now this should probably also include the full introspection query in the context
+- allow an optional env field for the model to use for the query agent since this would be better for a coding/instruct model
+- create a special system prompt telling the AI that it is a tool to generate graphql queries as part of the agent
+- integrate the agent tool calling into our primary chat bot. evaluate sample scripts to include uses that would require tool calling, written generically enough to work for any api
+- add logging in the console
+- create file logging outputs for the query agent and query response tool, similar to those created by introspection, chat and preview scripts
+- add a step to validate the query before it is returned or used by another agent, include retry logic if validation fails, this might require using apollo client or another tool to validate the syntax.
+- since we now have tool calling and multiple agents, it might be a good time to introduce langgraph
+- document the agent structure in the readme file, document any new scripts added to the package.json file, and create a mermaid chart showing the agent and tool orchestration
