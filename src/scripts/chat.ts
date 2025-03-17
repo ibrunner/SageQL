@@ -1,4 +1,3 @@
-import { OpenAI } from "openai";
 import { config } from "dotenv";
 import {
   loadIntrospectionSchema,
@@ -7,16 +6,15 @@ import {
   handlePromptSelection,
   type ChatMessage,
   logChatOutput,
+  createChatClient,
+  chatWithClient,
 } from "../lib/chat.js";
 
 // Load environment variables
 config();
 
-// Initialize OpenAI client with Claude configuration
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_API_BASE,
-});
+// Initialize the chat client
+const chatClient = createChatClient();
 
 async function chat(prompt: string, verbose = false) {
   try {
@@ -28,12 +26,12 @@ async function chat(prompt: string, verbose = false) {
       console.log("Messages being sent to LLM:", messages);
     }
 
-    // Get completion from Claude using OpenAI API spec
-    const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || "claude-3-sonnet-20240229",
+    // Get completion using the generic chat client
+    const completion = await chatWithClient(
       messages,
-      temperature: 0.7,
-    });
+      process.env.OPENAI_MODEL || "claude-3-sonnet-20240229",
+      chatClient,
+    );
 
     const response = completion.choices[0]?.message?.content || undefined;
     console.log("\nAI Response:", response);

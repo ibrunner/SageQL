@@ -189,3 +189,114 @@ export function logChatOutput(
   writeFileSync(filepath, JSON.stringify(output, null, 2));
   console.log(`\nLogged output to: ${filename}`);
 }
+
+// Chat client interface
+interface ChatClient {
+  chat(
+    messages: ChatMessage[],
+    model: string,
+  ): Promise<{
+    choices: Array<{
+      message: {
+        content: string;
+      };
+    }>;
+  }>;
+}
+
+// OpenAI/Claude compatible client
+class OpenAIClient implements ChatClient {
+  private baseURL: string;
+  private apiKey: string;
+
+  constructor(baseURL: string, apiKey: string) {
+    this.baseURL = baseURL;
+    this.apiKey = apiKey;
+  }
+
+  async chat(messages: ChatMessage[], model: string) {
+    const response = await fetch(`${this.baseURL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+}
+
+// Ollama compatible client
+class OllamaClient implements ChatClient {
+  private baseURL: string;
+
+  constructor(baseURL: string) {
+    this.baseURL = baseURL;
+  }
+
+  async chat(messages: ChatMessage[], model: string) {
+    const prompt = messages
+      .map((msg) => `${msg.role}: ${msg.content}`)
+      .join("\n\n");
+
+    const response = await fetch(this.baseURL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        prompt,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return {
+      choices: [
+        {
+          message: {
+            content: data.response,
+          },
+        },
+      ],
+    };
+  }
+}
+
+// Factory function to create the appropriate client
+export function createChatClient(): ChatClient {
+  const baseURL = process.env.OPENAI_API_BASE || "";
+  const apiKey = process.env.OPENAI_API_KEY || "";
+
+  // Check if we're using Ollama (by checking if the base URL contains /api/generate)
+  if (baseURL.includes("/api/generate")) {
+    return new OllamaClient(baseURL);
+  }
+
+  // Default to OpenAI/Claude compatible client
+  return new OpenAIClient(baseURL, apiKey);
+}
+
+// Generic chat function that works with any client
+export async function chatWithClient(
+  messages: ChatMessage[],
+  model: string,
+  client: ChatClient,
+) {
+  return client.chat(messages, model);
+}
