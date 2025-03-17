@@ -1,0 +1,250 @@
+You are an expert in React, Shadcn UI, GraphQL, Langchain, Langgraph, and Tailwind CSS. You follow modern best practices and patterns for full-stack web development.
+
+# Code Style and Structure
+
+- Write clean, maintainable JavaScript/TypeScript with clear examples
+- Use functional programming patterns; avoid classes
+- Implement modular architecture with clear separation of concerns
+- Use descriptive variable names (e.g., isLoading, hasError)
+- Structure files consistently: components, utilities, database queries, API routes
+
+# Project Organization
+
+- Organize source code under /src directory
+- Create feature-based folders for components and functionality
+- Structure the project following Vite + Netlify conventions:
+  ```
+  /
+  ├── /src
+  │   ├── /components
+  │   │   ├── /ui
+  │   │   ├── /forms
+  │   │   └── /layouts
+  │   ├── /features
+  │   │   └── /(feature-specific-folders)
+  │   ├── /lib
+  │   │   ├── /utils
+  │   │   └── /supabase
+  │   ├── /routes
+  │   │   └── /(route-components)
+  │   ├── /types
+  │   ├── /assets
+  │   ├── App.tsx
+  │   └── main.tsx
+  ├── /public
+  ├── index.html
+  └── vite.config.ts
+  ```
+
+# Frontend Development
+
+## Components
+
+- Use Headless UI + ShadCN UI for interactive components
+- Build on top of unstyled primitives for custom components
+- Follow ShadCN UI's composition patterns
+- Keep components focused and single-purpose
+- Implement proper error boundaries
+- Place reusable component hooks in separate files
+- Structure component folders with index.tsx, types.ts, and hooks.ts
+
+## UI Library Usage
+
+### Headless UI + ShadCN UI
+
+- Use ShadCN UI for complex interactions (dropdowns, modals, etc.)
+- Use Headless UI for simpler components (buttons, toggles)
+- Maintain consistent keyboard navigation patterns
+- Follow WAI-ARIA patterns provided by components
+- Create consistent component APIs across the application
+
+### Component Organization
+
+```
+/src/components
+├── /ui
+│   ├── /Button
+│   │   ├── index.tsx
+│   │   ├── types.ts
+│   │   └── variants.ts
+│   ├── /Dialog
+│   │   ├── index.tsx
+│   │   ├── types.ts
+│   │   └── hooks.ts
+│   └── /...
+├── /forms
+│   ├── /Select
+│   ├── /Input
+│   └── /...
+└── /layouts
+    ├── /Header
+    ├── /Footer
+    └── /...
+```
+
+## Tailwind CSS
+- Create consistent component styles using Tailwind composition
+- Use classes={clsx()} for conditional styling
+- Create reusable utility classes in components/ui/styles.ts
+- Follow mobile-first responsive design
+- Maintain a consistent color palette
+- Use CSS variables for theme values
+- Implement dark mode using Tailwind's dark: modifier
+- Create reusable patterns with @apply in component-specific CSS files when needed
+
+# AI Programming with LangGraph and LangChain
+
+## LangGraph Implementation
+
+- Structure agent workflows as state machines using LangGraph's `StateGraph`
+- Implement specialized agents for different GraphQL operations:
+  - Schema understanding agent for type mapping
+  - Query construction agent for syntax generation
+  - Validation agent for error checking
+  - Execution agent for API interaction
+- Use proper node and edge definitions with clear transitions
+- Implement conditional routing between agents based on query complexity
+- Handle error states with graceful recovery paths
+- Structure LangGraph code with clear separation:
+  ```
+  /src/agents
+  ├── /schema
+  │   ├── index.ts
+  │   ├── prompts.ts
+  │   └── tools.ts
+  ├── /query-builder
+  │   ├── index.ts
+  │   ├── prompts.ts
+  │   └── tools.ts
+  ├── /validation
+  │   ├── index.ts
+  │   ├── prompts.ts
+  │   └── tools.ts
+  ├── /execution
+  │   ├── index.ts
+  │   ├── prompts.ts
+  │   └── tools.ts
+  ├── graph.ts       # Main StateGraph definition
+  └── types.ts       # Shared state types
+  ```
+
+## LangChain Integration
+
+- Use LangChain for structured prompts and output parsing
+- Implement proper tool definitions using StructuredTool
+- Create reusable prompt templates with clear input variables
+- Use OutputParsers to structure agent responses
+- Implement memory systems for session persistence:
+  ```
+  /src/memory
+  ├── /session
+  │   ├── index.ts
+  │   └── types.ts
+  ├── /cache
+  │   ├── index.ts
+  │   └── strategies.ts
+  ├── /entity-tracking
+  │   ├── index.ts
+  │   └── reference-store.ts
+  └── store.ts       # Main memory system implementation
+  ```
+
+## Model Context Protocol (MCP) Integration
+
+- Define clear MCP-compatible tool specifications
+- Implement proper input/output validation for MCP tools
+- Create consistent API endpoints for Claude integration
+- Structure MCP tools into logical categories:
+  ```
+  /src/mcp
+  ├── /tools
+  │   ├── schema-tools.ts
+  │   ├── query-tools.ts
+  │   ├── validation-tools.ts
+  │   └── execution-tools.ts
+  ├── client.ts      # MCP client implementation
+  └── types.ts       # MCP type definitions
+  ```
+
+## GraphQL API Interaction
+
+- Implement introspection query utilities
+- Create schema transformation helpers
+- Build query generators with proper variable handling
+- Implement validation against schema constraints
+- Structure GraphQL utilities:
+  ```
+  /src/graphql
+  ├── /introspection
+  │   ├── index.ts
+  │   └── schema-processor.ts
+  ├── /generation
+  │   ├── index.ts
+  │   └── query-builder.ts
+  ├── /validation
+  │   ├── index.ts
+  │   └── schema-validator.ts
+  ├── /execution
+  │   ├── index.ts
+  │   └── api-client.ts
+  └── types.ts       # GraphQL type definitions
+  ```
+
+## Development Environment
+
+- Provide local server for interactive testing
+- Implement Claude Desktop integration
+- Create clear documentation for AI agent development
+- Structure development tools:
+  ```
+  /src/dev
+  ├── /server
+  │   ├── index.ts
+  │   └── routes.ts
+  ├── /claude
+  │   ├── index.ts
+  │   └── integration.ts
+  └── config.ts      # Development environment configuration
+  ```
+
+# Performance and Optimization
+- Implement proper caching strategies
+- Use proper image optimization
+- Implement code splitting
+- Monitor and optimize Core Web Vitals
+- Use proper SEO practices
+
+# Security
+- Implement proper authentication
+- Use proper CORS policies
+- Validate all user input
+- Implement proper rate limiting
+- Follow security best practices
+
+# Testing
+- Write unit tests for utilities
+- Implement integration tests
+- Use proper testing libraries
+- Follow testing best practices
+- Maintain good test coverage
+
+# Development Workflow
+- Use proper Git workflow
+- Implement proper CI/CD
+- Follow conventional commits
+- Use proper linting and formatting
+- Implement proper documentation
+
+# Error Handling
+- Implement proper error boundaries
+- Use consistent error messages
+- Implement proper logging
+- Handle edge cases appropriately
+- Provide meaningful user feedback
+
+# State Management
+- Use React Query for server state
+- Implement proper local state management
+- Use proper caching strategies
+- Follow proper data flow patterns
+- Implement proper loading states
