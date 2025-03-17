@@ -159,30 +159,19 @@ async function fetchIntrospection() {
 
     // Generate timestamped filename
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const timestampedFile = join(
+    const outputFile = join(
       env.INTROSPECTION_OUTPUT_DIR,
       `schema-${timestamp}.json`,
     );
-    const latestFile = join(env.INTROSPECTION_OUTPUT_DIR, "schema-latest.json");
 
-    // Save timestamped file
-    await writeFile(timestampedFile, JSON.stringify(data, null, 2));
-    console.log(`\nSchema saved to ${timestampedFile}`);
-
-    // Update symlink to latest
+    // Save schema file
     try {
-      await symlink(timestampedFile, latestFile, "file");
+      await writeFile(outputFile, JSON.stringify(data, null, 2));
+      console.log(`\nSchema saved to ${outputFile}`);
     } catch (error) {
-      // If symlink exists, remove it first
-      if ((error as NodeJS.ErrnoException).code === "EEXIST") {
-        await unlink(latestFile);
-        await symlink(timestampedFile, latestFile, "file");
-      } else {
-        throw error;
-      }
+      console.error("Error saving schema file:", error);
+      throw error;
     }
-
-    console.log("Latest schema symlink updated");
   } catch (error) {
     console.error("Error fetching schema:");
 
