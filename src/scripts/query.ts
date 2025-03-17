@@ -8,8 +8,9 @@ import {
   ChatPromptTemplate,
   MessagesPlaceholder,
 } from "@langchain/core/prompts";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { HumanMessage } from "@langchain/core/messages";
 import { z } from "zod";
+import { RESPONSE_FORMATTER_PROMPT } from "./prompts/response-formatter.js";
 
 config();
 
@@ -23,23 +24,6 @@ const envSchema = z.object({
 
 // Validate environment variables
 const env = envSchema.parse(process.env);
-
-const RESPONSE_GENERATOR_PROMPT = `You are a helpful assistant that provides natural language responses to questions about the Rick and Morty universe using GraphQL queries.
-
-Your role is to:
-1. Understand the user's question
-2. Use the provided GraphQL query results to answer their question
-3. Provide a clear, concise, and natural response
-4. Include relevant details from the query results
-5. If the query results are empty or don't contain the information needed, explain that
-
-Current query results:
-{queryResults}
-
-User's question:
-{question}
-
-Provide a natural language response to the user's question based on the query results.`;
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -83,13 +67,89 @@ async function runQueryWithRetry(
 
         if (attempt < maxRetries) {
           console.log("\nRetrying with updated context...");
+
+          // Analyze validation errors to provide better guidance
+          const fieldNameErrors = result.validationErrors.filter(
+            (error: string) =>
+              error.includes("Cannot query field") ||
+              error.includes("Did you mean"),
+          );
+          const argumentErrors = result.validationErrors.filter(
+            (error: string) =>
+              error.includes("argument") || error.includes("Unknown argument"),
+          );
+          const typeErrors = result.validationErrors.filter(
+            (error: string) =>
+              error.includes("type") && !error.includes("field"),
+          );
+
+          // Extract field name suggestions from errors
+          const fieldSuggestions = fieldNameErrors
+            .map((error: string) => {
+              const suggestionMatch = error.match(/Did you mean "([^"]+)"\?/);
+              return suggestionMatch ? suggestionMatch[1] : null;
+            })
+            .filter(Boolean);
+
+          // Extract field names that need to be replaced
+          const fieldsToReplace = fieldNameErrors
+            .map((error: string) => {
+              const fieldMatch = error.match(/Cannot query field "([^"]+)"/);
+              return fieldMatch ? fieldMatch[1] : null;
+            })
+            .filter(Boolean);
+
           currentState = {
             ...currentState,
             messages: [
-              ...currentState.messages,
-              `Previous query failed with errors: ${result.validationErrors.join(", ")}`,
-              `Current query was: ${result.currentQuery}`,
-              "Please fix the validation errors and try again",
+              ...currentState.messages.slice(0, 1), // Keep the original query
+              `The previous query failed with validation errors. Please fix these issues while maintaining the original query intent:`,
+              ...(fieldNameErrors.length > 0
+                ? [
+                    `Field Name Errors:`,
+                    ...fieldNameErrors.map((error: string) => `- ${error}`),
+                    ...(fieldSuggestions.length > 0
+                      ? [
+                          `Suggested field names to use:`,
+                          ...fieldSuggestions.map(
+                            (suggestion: string) => `- ${suggestion}`,
+                          ),
+                        ]
+                      : []),
+                    `Please use ONLY the exact field names from the schema. Do not guess or abbreviate field names.`,
+                  ]
+                : []),
+              ...(argumentErrors.length > 0
+                ? [
+                    `Argument Errors:`,
+                    ...argumentErrors.map((error: string) => `- ${error}`),
+                    `Please use ONLY the arguments defined in the schema.`,
+                  ]
+                : []),
+              ...(typeErrors.length > 0
+                ? [
+                    `Type Errors:`,
+                    ...typeErrors.map((error: string) => `- ${error}`),
+                    `Please ensure all field types match the schema exactly.`,
+                  ]
+                : []),
+              `Previous query that failed:`,
+              currentState.currentQuery,
+              `Please generate a new query that:`,
+              `1. Maintains the original query intent`,
+              `2. Uses ONLY the exact field names from the schema`,
+              `3. Includes ONLY fields that are directly relevant to the request`,
+              `4. Uses ONLY the arguments defined in the schema`,
+              `5. Follows proper GraphQL syntax`,
+              `6. Keeps the same field selection structure`,
+              ...(fieldSuggestions.length > 0
+                ? [
+                    `7. Uses the suggested field names where applicable`,
+                    `8. Replaces any incorrect field names with their correct versions from the schema`,
+                  ]
+                : []),
+              `Original request:`,
+              currentState.messages[0],
             ],
             validationErrors: [],
           };
@@ -112,10 +172,17 @@ async function runQueryWithRetry(
         currentState = {
           ...currentState,
           messages: [
-            ...currentState.messages,
-            `Previous query failed with error: ${error instanceof Error ? error.message : String(error)}`,
-            `Current query was: ${currentState.currentQuery}`,
-            "Please fix the query and try again",
+            ...currentState.messages.slice(0, 1), // Keep the original query
+            `The previous query failed with an execution error. Please review and fix the issues:`,
+            `Error: ${error instanceof Error ? error.message : String(error)}`,
+            `Previous query that failed:`,
+            currentState.currentQuery,
+            `Please generate a new query that:`,
+            `1. Uses ONLY the exact field names from the schema`,
+            `2. Includes ONLY fields that are directly relevant to the request`,
+            `3. Uses ONLY the arguments defined in the schema`,
+            `4. Maintains the original intent of the query`,
+            `5. Follows proper GraphQL syntax`,
           ],
           validationErrors: [],
         };
@@ -181,7 +248,7 @@ async function main() {
     });
 
     const prompt = ChatPromptTemplate.fromMessages([
-      ["system", RESPONSE_GENERATOR_PROMPT],
+      ["system", RESPONSE_FORMATTER_PROMPT],
       new MessagesPlaceholder("messages"),
     ]);
 

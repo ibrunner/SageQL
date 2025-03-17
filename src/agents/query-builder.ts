@@ -1,12 +1,10 @@
 import { ChatOpenAI } from "@langchain/openai";
-import { AgentExecutor, createOpenAIFunctionsAgent } from "langchain/agents";
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
 } from "@langchain/core/prompts";
 import { BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { GraphQLSchema, parse, validate } from "graphql";
-import { getIntrospectionQuery } from "graphql";
 import { config } from "dotenv";
 import { z } from "zod";
 
@@ -28,23 +26,39 @@ const QUERY_BUILDER_PROMPT = `You are a GraphQL query generator tool. Your ONLY 
 IMPORTANT RULES:
 1. ONLY return the GraphQL query - no explanations, no markdown, no code blocks
 2. The query must be valid according to the provided schema
-3. Include ALL fields that would be relevant to answering the user's request
-4. When grouping or filtering is requested, include the necessary fields for that operation
-5. For list queries, include fields that would be useful for displaying the data
+3. Include ONLY fields that are explicitly needed to answer the user's request
+4. When grouping or filtering is requested, include ONLY the necessary fields for that operation
+5. For list queries, include ONLY fields that are explicitly requested or required for display
 6. Handle pagination when needed
 7. Use fragments for reusable query parts
 
 FIELD SELECTION GUIDELINES:
-1. Always include fields that are explicitly mentioned in the request
-2. Include fields that would be needed for any grouping or filtering operations
-3. For list views, include fields that would be useful for display (name, id, type, etc.)
-4. Include fields that would help understand relationships between entities
-5. When filtering by a field, include that field in the selection
+1. ONLY include fields that are explicitly mentioned in the request
+2. ONLY include fields that are required for filtering or grouping operations
+3. For list views, ONLY include fields that are explicitly requested
+4. ONLY include fields that are directly relevant to the relationships being queried
+5. When filtering by a field, ONLY include that field in the selection
+6. If the user is asking about an entity's property, ONLY include that specific property field
+7. NEVER include fields that are not directly relevant to the request
+8. NEVER include fields that are not available on the entity
+9. ALWAYS use the exact field names from the schema - do not guess or abbreviate
+10. If a field name in the request doesn't match the schema, use the exact name from the schema
+
+ERROR HANDLING:
+1. If a field name doesn't exist in the schema, check for similar names
+2. If a field type doesn't match, check the schema for the correct type
+3. If a field is missing required arguments, include them
+4. If a field has incorrect arguments, use only the arguments defined in the schema
+5. When fixing a query:
+   - Keep the original query intent
+   - Use ONLY the fields and arguments available in the schema
+   - Fix field names to match the schema exactly
+   - Remove any invalid arguments
+   - Add any required arguments
+   - Keep the same field selection structure
 
 Current schema:
 {schema}
-
-{agent_scratchpad}
 
 Generate a valid GraphQL query that satisfies this request.`;
 
@@ -101,7 +115,6 @@ function validateGraphQLQuery(
 export class QueryBuilderAgent {
   private model: ChatOpenAI;
   private prompt: ChatPromptTemplate;
-  private executor!: AgentExecutor;
   private verbose: boolean;
 
   constructor(
@@ -124,24 +137,6 @@ export class QueryBuilderAgent {
     ]);
   }
 
-  async initialize() {
-    if (this.verbose) console.log("\n=== Initializing Query Builder Agent ===");
-
-    const agent = await createOpenAIFunctionsAgent({
-      llm: this.model,
-      prompt: this.prompt,
-      tools: [],
-    });
-    if (this.verbose) console.log("Agent created successfully");
-
-    this.executor = AgentExecutor.fromAgentAndTools({
-      agent,
-      tools: [],
-      verbose: this.verbose,
-    });
-    if (this.verbose) console.log("Agent executor created successfully");
-  }
-
   async generateQuery(
     request: string,
     schema: GraphQLSchema,
@@ -149,26 +144,26 @@ export class QueryBuilderAgent {
     if (this.verbose) console.log("\n=== Generating Query ===");
     if (this.verbose) console.log("Request:", request);
 
-    if (!this.executor) {
-      await this.initialize();
-    }
-
     const state: QueryBuilderState = {
       messages: [],
       schema,
     };
 
-    if (this.verbose) console.log("\n=== Invoking Agent Executor ===");
-    const result = await this.executor.invoke({
-      input: request,
-      schema: JSON.stringify(schema),
-      agent_scratchpad: "",
-      messages: [new HumanMessage(request)],
-    });
-    if (this.verbose) console.log("Agent execution completed");
+    if (this.verbose) console.log("\n=== Invoking Model ===");
+    const response = await this.model.invoke(
+      await this.prompt.format({
+        schema: JSON.stringify(schema),
+        messages: [new HumanMessage(request)],
+      }),
+    );
+    if (this.verbose) console.log("Model execution completed");
 
     // Extract the query from the response
-    const extractedQuery = extractGraphQLQuery(result.output);
+    const extractedQuery = extractGraphQLQuery(
+      typeof response.content === "string"
+        ? response.content
+        : JSON.stringify(response.content),
+    );
     if (this.verbose) console.log("Extracted query:", extractedQuery);
 
     // Validate the extracted query

@@ -13,7 +13,8 @@
     "introspect": "tsx src/scripts/introspect.ts",
     "chat": "tsx src/scripts/chat.ts",
     "preview": "tsx src/scripts/preview.ts",
-    "query": "tsx src/scripts/query.ts"
+    "query": "tsx src/scripts/query.ts",
+    "explore": "tsx src/scripts/explore.ts"
   },
   "dependencies": {
     "@apollo/client": "^3.9.5",

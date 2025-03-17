@@ -18,7 +18,6 @@ export async function createQueryGraph(
 ) {
   // Create tools
   const queryBuilder = new QueryBuilderAgent(undefined, verbose);
-  await queryBuilder.initialize();
   const validator = new QueryValidatorTool();
   const executor = new GraphQLExecutorTool(apiEndpoint);
 
