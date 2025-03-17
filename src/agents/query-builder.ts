@@ -28,9 +28,18 @@ const QUERY_BUILDER_PROMPT = `You are a GraphQL query generator tool. Your ONLY 
 IMPORTANT RULES:
 1. ONLY return the GraphQL query - no explanations, no markdown, no code blocks
 2. The query must be valid according to the provided schema
-3. Include all necessary fields and arguments
-4. Handle pagination when needed
-5. Use fragments for reusable query parts
+3. Include ALL fields that would be relevant to answering the user's request
+4. When grouping or filtering is requested, include the necessary fields for that operation
+5. For list queries, include fields that would be useful for displaying the data
+6. Handle pagination when needed
+7. Use fragments for reusable query parts
+
+FIELD SELECTION GUIDELINES:
+1. Always include fields that are explicitly mentioned in the request
+2. Include fields that would be needed for any grouping or filtering operations
+3. For list views, include fields that would be useful for display (name, id, type, etc.)
+4. Include fields that would help understand relationships between entities
+5. When filtering by a field, include that field in the selection
 
 Current schema:
 {schema}

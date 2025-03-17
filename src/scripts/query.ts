@@ -54,6 +54,81 @@ function parseArgs() {
   return { query, verbose };
 }
 
+async function runQueryWithRetry(
+  graph: any,
+  initialState: GraphState,
+  maxRetries: number = 3,
+  verbose: boolean = false,
+): Promise<GraphState> {
+  let currentState = initialState;
+  let attempt = 1;
+
+  while (attempt <= maxRetries) {
+    if (verbose) {
+      console.log(`\n=== Attempt ${attempt}/${maxRetries} ===`);
+      if (attempt > 1) {
+        console.log("Previous query:", currentState.currentQuery);
+        console.log("Previous errors:", currentState.validationErrors);
+      }
+    }
+
+    try {
+      const result = await graph.invoke(currentState);
+
+      if (result.validationErrors?.length) {
+        console.log("\nValidation Errors:");
+        result.validationErrors.forEach((error: string) =>
+          console.log(`- ${error}`),
+        );
+
+        if (attempt < maxRetries) {
+          console.log("\nRetrying with updated context...");
+          currentState = {
+            ...currentState,
+            messages: [
+              ...currentState.messages,
+              `Previous query failed with errors: ${result.validationErrors.join(", ")}`,
+              `Current query was: ${result.currentQuery}`,
+              "Please fix the validation errors and try again",
+            ],
+            validationErrors: [],
+          };
+          attempt++;
+          continue;
+        }
+      }
+
+      return result;
+    } catch (error) {
+      console.log("\nExecution Error:");
+      if (error instanceof Error) {
+        console.log(`- ${error.message}`);
+      } else {
+        console.log(`- ${error}`);
+      }
+
+      if (attempt < maxRetries) {
+        console.log("\nRetrying with updated context...");
+        currentState = {
+          ...currentState,
+          messages: [
+            ...currentState.messages,
+            `Previous query failed with error: ${error instanceof Error ? error.message : String(error)}`,
+            `Current query was: ${currentState.currentQuery}`,
+            "Please fix the query and try again",
+          ],
+          validationErrors: [],
+        };
+        attempt++;
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error("Max retries reached without successful validation");
+}
+
 async function main() {
   try {
     const { query, verbose } = parseArgs();
@@ -91,7 +166,7 @@ async function main() {
 
     // Run the graph
     if (verbose) console.log("\n=== Running Query Graph ===");
-    const result = await graph.invoke(initialState);
+    const result = await runQueryWithRetry(graph, initialState, 3, verbose);
     if (verbose) console.log("Graph execution completed");
 
     // Generate natural language response
