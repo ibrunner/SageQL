@@ -12,7 +12,7 @@ You are an expert in React, Shadcn UI, GraphQL, Langchain, Langgraph, and Tailwi
 
 - Organize source code under /src directory
 - Create feature-based folders for components and functionality
-- Structure the project following Vite + Netlify conventions:
+- Structure the project following Vite conventions:
   ```
   /
   ├── /src
