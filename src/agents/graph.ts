@@ -6,59 +6,73 @@ import { GraphQLSchema } from "graphql";
 
 export interface GraphState {
   messages: string[];
-  schema: GraphQLSchema;
+  schema: string;
   currentQuery: string;
   validationErrors: string[];
   executionResult: any;
 }
 
 export async function createQueryGraph(
-  apiEndpoint: string,
+  apiUrl: string,
   verbose: boolean = false,
-) {
+): Promise<RunnableSequence> {
   // Create tools
-  const queryBuilder = new QueryBuilderAgent(undefined, verbose);
+  const queryBuilder = new QueryBuilderAgent(
+    process.env.OPENAI_MODEL || "gpt-4-turbo-preview",
+    verbose,
+  );
   const validator = new QueryValidatorTool();
-  const executor = new GraphQLExecutorTool(apiEndpoint);
+  const executor = new GraphQLExecutorTool(apiUrl);
 
-  // Create the sequence
-  return RunnableSequence.from([
+  // Create the graph
+  const graph = RunnableSequence.from([
+    // Query builder step
     async (state: GraphState) => {
       if (verbose) console.log("\n=== Query Builder Step ===");
       const result = await queryBuilder.generateQuery(
         state.messages[state.messages.length - 1],
         state.schema,
       );
-      if (verbose) console.log("Query builder result:", result);
       return {
         ...state,
         currentQuery: result.query,
-        validationErrors: result.errors || [],
+        validationErrors: result.errors,
       };
     },
+    // Validator step
     async (state: GraphState) => {
       if (verbose) console.log("\n=== Query Validator Step ===");
-      const validationResult = await validator._call({
+      const result = await validator.call({
         query: state.currentQuery,
         schema: state.schema,
       });
-      if (verbose) console.log("Validation result:", validationResult);
-      const { isValid, errors } = JSON.parse(validationResult);
+      const validationResult = JSON.parse(result);
+      if (verbose) {
+        console.log("Validation result:", validationResult);
+      }
       return {
         ...state,
-        validationErrors: errors,
+        validationErrors: validationResult.errors,
       };
     },
+    // Executor step
     async (state: GraphState) => {
       if (verbose) console.log("\n=== Query Executor Step ===");
-      const result = await executor._call({
+      if (state.validationErrors?.length > 0) {
+        return state;
+      }
+      const result = await executor.call({
         query: state.currentQuery,
       });
-      if (verbose) console.log("Execution result:", result);
+      if (verbose) {
+        console.log("Execution result:", result);
+      }
       return {
         ...state,
-        executionResult: JSON.parse(result),
+        executionResult: result,
       };
     },
   ]);
+
+  return graph;
 }

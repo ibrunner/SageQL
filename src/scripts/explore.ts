@@ -2,7 +2,6 @@ import { config } from "dotenv";
 import { createQueryGraph } from "../agents/graph.js";
 import { GraphState } from "../agents/graph.js";
 import { loadLatestSchema } from "../lib/schema.js";
-import { buildClientSchema } from "graphql";
 import { ChatOpenAI } from "@langchain/openai";
 import {
   ChatPromptTemplate,
@@ -145,10 +144,6 @@ async function main() {
     const schemaJson = loadLatestSchema();
     if (verbose) console.log("Schema JSON loaded successfully");
 
-    if (verbose) console.log("\n=== Building GraphQL Schema ===");
-    const schema = buildClientSchema(JSON.parse(schemaJson));
-    if (verbose) console.log("GraphQL Schema built successfully");
-
     // Create the query graph
     if (verbose) console.log("\n=== Creating Query Graph ===");
     const graph = await createQueryGraph(env.GRAPHQL_API_URL, verbose);
@@ -185,7 +180,7 @@ async function main() {
       // Initialize the graph state
       const initialState: GraphState = {
         messages: [explorationResponse.content.toString()],
-        schema,
+        schema: schemaJson,
         currentQuery: "",
         validationErrors: [],
         executionResult: null,

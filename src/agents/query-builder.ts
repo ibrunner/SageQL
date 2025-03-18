@@ -4,7 +4,7 @@ import {
   MessagesPlaceholder,
 } from "@langchain/core/prompts";
 import { BaseMessage, HumanMessage } from "@langchain/core/messages";
-import { GraphQLSchema, parse, validate } from "graphql";
+import { GraphQLSchema, parse, validate, buildClientSchema } from "graphql";
 import { config } from "dotenv";
 import { z } from "zod";
 
@@ -44,18 +44,29 @@ FIELD SELECTION GUIDELINES:
 9. ALWAYS use the exact field names from the schema - do not guess or abbreviate
 10. If a field name in the request doesn't match the schema, use the exact name from the schema
 
-ERROR HANDLING:
-1. If a field name doesn't exist in the schema, check for similar names
-2. If a field type doesn't match, check the schema for the correct type
-3. If a field is missing required arguments, include them
-4. If a field has incorrect arguments, use only the arguments defined in the schema
-5. When fixing a query:
-   - Keep the original query intent
-   - Use ONLY the fields and arguments available in the schema
-   - Fix field names to match the schema exactly
-   - Remove any invalid arguments
-   - Add any required arguments
-   - Keep the same field selection structure
+FILTER GUIDELINES:
+1. When using filters, check the schema for the correct filter input type
+2. Look for filter input types in the schema (e.g., "FilterInput", "QueryOperatorInput")
+3. Check the schema for the exact structure of filter arguments
+4. Verify the filter field names match the schema exactly
+5. Ensure filter values match the expected type in the schema
+6. When filtering by relationships, check the schema for the correct field name
+
+QUERY STRUCTURE GUIDELINES:
+1. Start by examining the schema's Query type to find the root field
+2. Check the return type of each field to understand what fields are available
+3. For nested objects, check their type definition in the schema
+4. For lists, ensure you're using the correct field name and arguments
+5. For relationships, verify the field name and any required arguments
+6. When using arguments, check their type definition in the schema
+
+ERROR PREVENTION:
+1. Before using a field, verify it exists in the schema
+2. Check the type of each field to ensure it matches the schema
+3. Verify all required arguments are provided
+4. Ensure argument values match their expected types
+5. For filters, verify the structure matches the schema's input type
+6. For relationships, check both the field name and the related type
 
 Current schema:
 {schema}
@@ -64,7 +75,7 @@ Generate a valid GraphQL query that satisfies this request.`;
 
 export interface QueryBuilderState {
   messages: BaseMessage[];
-  schema: GraphQLSchema;
+  schema: string;
   currentQuery?: string;
   validationErrors?: string[];
 }
@@ -139,10 +150,11 @@ export class QueryBuilderAgent {
 
   async generateQuery(
     request: string,
-    schema: GraphQLSchema,
+    schema: string,
   ): Promise<{ query: string; errors?: string[] }> {
     if (this.verbose) console.log("\n=== Generating Query ===");
     if (this.verbose) console.log("Request:", request);
+    if (this.verbose) console.log("Schema:", schema);
 
     const state: QueryBuilderState = {
       messages: [],
@@ -150,13 +162,15 @@ export class QueryBuilderAgent {
     };
 
     if (this.verbose) console.log("\n=== Invoking Model ===");
-    const response = await this.model.invoke(
-      await this.prompt.format({
-        schema: JSON.stringify(schema),
-        messages: [new HumanMessage(request)],
-      }),
-    );
+    const formattedPrompt = await this.prompt.format({
+      schema,
+      messages: [new HumanMessage(request)],
+    });
+    if (this.verbose) console.log("Formatted prompt:", formattedPrompt);
+
+    const response = await this.model.invoke(formattedPrompt);
     if (this.verbose) console.log("Model execution completed");
+    if (this.verbose) console.log("Raw response:", response);
 
     // Extract the query from the response
     const extractedQuery = extractGraphQLQuery(
@@ -166,8 +180,11 @@ export class QueryBuilderAgent {
     );
     if (this.verbose) console.log("Extracted query:", extractedQuery);
 
+    // Parse the schema for validation
+    const parsedSchema = buildClientSchema(JSON.parse(schema));
+
     // Validate the extracted query
-    const validation = validateGraphQLQuery(extractedQuery, schema);
+    const validation = validateGraphQLQuery(extractedQuery, parsedSchema);
     if (this.verbose) {
       console.log("Validation result:", validation);
     }

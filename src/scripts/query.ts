@@ -2,7 +2,6 @@ import { config } from "dotenv";
 import { createQueryGraph } from "../agents/graph.js";
 import { GraphState } from "../agents/graph.js";
 import { loadLatestSchema } from "../lib/schema.js";
-import { buildClientSchema } from "graphql";
 import { ChatOpenAI } from "@langchain/openai";
 import {
   ChatPromptTemplate,
@@ -53,13 +52,15 @@ async function runQueryWithRetry(
       if (attempt > 1) {
         console.log("Previous query:", currentState.currentQuery);
         console.log("Previous errors:", currentState.validationErrors);
+        console.log("Current messages:", currentState.messages);
       }
     }
 
     try {
       const result = await graph.invoke(currentState);
 
-      if (result.validationErrors?.length) {
+      // Check for validation errors first
+      if (result.validationErrors?.length > 0) {
         console.log("\nValidation Errors:");
         result.validationErrors.forEach((error: string) =>
           console.log(`- ${error}`),
@@ -82,6 +83,10 @@ async function runQueryWithRetry(
             (error: string) =>
               error.includes("type") && !error.includes("field"),
           );
+          const filterErrors = result.validationErrors.filter(
+            (error: string) =>
+              error.includes("filter") || error.includes("input"),
+          );
 
           // Extract field name suggestions from errors
           const fieldSuggestions = fieldNameErrors
@@ -99,58 +104,82 @@ async function runQueryWithRetry(
             })
             .filter(Boolean);
 
+          const retryContext = [
+            currentState.messages[0], // Keep the original request
+            `The previous query failed with validation errors. Please fix these issues while maintaining the original query intent:`,
+            ...(fieldNameErrors.length > 0
+              ? [
+                  `Field Name Errors:`,
+                  ...fieldNameErrors.map((error: string) => `- ${error}`),
+                  ...(fieldSuggestions.length > 0
+                    ? [
+                        `Suggested field names to use:`,
+                        ...fieldSuggestions.map(
+                          (suggestion: string) => `- ${suggestion}`,
+                        ),
+                      ]
+                    : []),
+                  `Please use ONLY the exact field names from the schema. Do not guess or abbreviate field names.`,
+                ]
+              : []),
+            ...(argumentErrors.length > 0
+              ? [
+                  `Argument Errors:`,
+                  ...argumentErrors.map((error: string) => `- ${error}`),
+                  `Please use ONLY the arguments defined in the schema.`,
+                ]
+              : []),
+            ...(typeErrors.length > 0
+              ? [
+                  `Type Errors:`,
+                  ...typeErrors.map((error: string) => `- ${error}`),
+                  `Please ensure all field types match the schema exactly.`,
+                ]
+              : []),
+            ...(filterErrors.length > 0
+              ? [
+                  `Filter Errors:`,
+                  ...filterErrors.map((error: string) => `- ${error}`),
+                  `Please ensure filters follow these guidelines:`,
+                  `1. Use standard two-letter codes for continents (e.g., "EU" for Europe)`,
+                  `2. Use ISO codes for countries and languages`,
+                  `3. Follow the exact filter structure from the schema`,
+                  `4. Check the schema for the correct filter input type`,
+                ]
+              : []),
+            `Previous query that failed:`,
+            currentState.currentQuery,
+            `Please generate a new query that:`,
+            `1. Maintains the original query intent`,
+            `2. Uses ONLY the exact field names from the schema`,
+            `3. Includes ONLY fields that are directly relevant to the request`,
+            `4. Uses ONLY the arguments defined in the schema`,
+            `5. Follows proper GraphQL syntax`,
+            `6. Keeps the same field selection structure`,
+            ...(fieldSuggestions.length > 0
+              ? [
+                  `7. Uses the suggested field names where applicable`,
+                  `8. Replaces any incorrect field names with their correct versions from the schema`,
+                ]
+              : []),
+            ...(filterErrors.length > 0
+              ? [
+                  `9. Uses the correct filter codes and structures`,
+                  `10. Follows the filter guidelines for continents, countries, and languages`,
+                ]
+              : []),
+            `Schema context:`,
+            JSON.stringify(currentState.schema, null, 2),
+          ];
+
+          if (verbose) {
+            console.log("\nRetry context being sent to model:");
+            console.log(retryContext.join("\n"));
+          }
+
           currentState = {
             ...currentState,
-            messages: [
-              ...currentState.messages.slice(0, 1), // Keep the original query
-              `The previous query failed with validation errors. Please fix these issues while maintaining the original query intent:`,
-              ...(fieldNameErrors.length > 0
-                ? [
-                    `Field Name Errors:`,
-                    ...fieldNameErrors.map((error: string) => `- ${error}`),
-                    ...(fieldSuggestions.length > 0
-                      ? [
-                          `Suggested field names to use:`,
-                          ...fieldSuggestions.map(
-                            (suggestion: string) => `- ${suggestion}`,
-                          ),
-                        ]
-                      : []),
-                    `Please use ONLY the exact field names from the schema. Do not guess or abbreviate field names.`,
-                  ]
-                : []),
-              ...(argumentErrors.length > 0
-                ? [
-                    `Argument Errors:`,
-                    ...argumentErrors.map((error: string) => `- ${error}`),
-                    `Please use ONLY the arguments defined in the schema.`,
-                  ]
-                : []),
-              ...(typeErrors.length > 0
-                ? [
-                    `Type Errors:`,
-                    ...typeErrors.map((error: string) => `- ${error}`),
-                    `Please ensure all field types match the schema exactly.`,
-                  ]
-                : []),
-              `Previous query that failed:`,
-              currentState.currentQuery,
-              `Please generate a new query that:`,
-              `1. Maintains the original query intent`,
-              `2. Uses ONLY the exact field names from the schema`,
-              `3. Includes ONLY fields that are directly relevant to the request`,
-              `4. Uses ONLY the arguments defined in the schema`,
-              `5. Follows proper GraphQL syntax`,
-              `6. Keeps the same field selection structure`,
-              ...(fieldSuggestions.length > 0
-                ? [
-                    `7. Uses the suggested field names where applicable`,
-                    `8. Replaces any incorrect field names with their correct versions from the schema`,
-                  ]
-                : []),
-              `Original request:`,
-              currentState.messages[0],
-            ],
+            messages: retryContext,
             validationErrors: [],
           };
           attempt++;
@@ -169,21 +198,30 @@ async function runQueryWithRetry(
 
       if (attempt < maxRetries) {
         console.log("\nRetrying with updated context...");
+        const retryContext = [
+          currentState.messages[0], // Keep the original request
+          `The previous query failed with an execution error. Please review and fix the issues:`,
+          `Error: ${error instanceof Error ? error.message : String(error)}`,
+          `Previous query that failed:`,
+          currentState.currentQuery,
+          `Please generate a new query that:`,
+          `1. Uses ONLY the exact field names from the schema`,
+          `2. Includes ONLY fields that are directly relevant to the request`,
+          `3. Uses ONLY the arguments defined in the schema`,
+          `4. Maintains the original intent of the query`,
+          `5. Follows proper GraphQL syntax`,
+          `Schema context:`,
+          JSON.stringify(currentState.schema, null, 2),
+        ];
+
+        if (verbose) {
+          console.log("\nRetry context being sent to model:");
+          console.log(retryContext.join("\n"));
+        }
+
         currentState = {
           ...currentState,
-          messages: [
-            ...currentState.messages.slice(0, 1), // Keep the original query
-            `The previous query failed with an execution error. Please review and fix the issues:`,
-            `Error: ${error instanceof Error ? error.message : String(error)}`,
-            `Previous query that failed:`,
-            currentState.currentQuery,
-            `Please generate a new query that:`,
-            `1. Uses ONLY the exact field names from the schema`,
-            `2. Includes ONLY fields that are directly relevant to the request`,
-            `3. Uses ONLY the arguments defined in the schema`,
-            `4. Maintains the original intent of the query`,
-            `5. Follows proper GraphQL syntax`,
-          ],
+          messages: retryContext,
           validationErrors: [],
         };
         attempt++;
@@ -210,10 +248,6 @@ async function main() {
     const schemaJson = loadLatestSchema();
     if (verbose) console.log("Schema JSON loaded successfully");
 
-    if (verbose) console.log("\n=== Building GraphQL Schema ===");
-    const schema = buildClientSchema(JSON.parse(schemaJson));
-    if (verbose) console.log("GraphQL Schema built successfully");
-
     // Create the query graph
     if (verbose) console.log("\n=== Creating Query Graph ===");
     const graph = await createQueryGraph(env.GRAPHQL_API_URL, verbose);
@@ -223,7 +257,7 @@ async function main() {
     if (verbose) console.log("\n=== Initializing Graph State ===");
     const initialState: GraphState = {
       messages: [query],
-      schema,
+      schema: schemaJson,
       currentQuery: "",
       validationErrors: [],
       executionResult: null,
