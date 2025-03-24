@@ -10,7 +10,7 @@ import {
 import { HumanMessage } from "@langchain/core/messages";
 import { z } from "zod";
 import { RESPONSE_FORMATTER_PROMPT } from "../prompts/agent/response-formatter.js";
-
+import { EXPLORE_PROMPT } from "../prompts/developer/explore.js";
 config();
 
 // Environment schema
@@ -23,22 +23,6 @@ const envSchema = z.object({
 
 // Validate environment variables
 const env = envSchema.parse(process.env);
-
-const EXPLORATION_PROMPT = `You are a human user interested in exploring a GraphQL API. Your role is to ask natural, human-like questions about the data and relationships available in the API.
-
-When asking questions:
-1. Ask questions that a real user would ask about the data
-2. Focus on interesting relationships and patterns
-3. Ask questions that require complex data relationships
-4. Be specific about what information you want
-5. Use natural language, not technical terms
-
-Current schema:
-{schema}
-
-{agent_scratchpad}
-
-Ask an interesting question about the data available in this API.`;
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -160,7 +144,7 @@ async function main() {
     });
 
     const explorationPrompt = ChatPromptTemplate.fromMessages([
-      ["system", EXPLORATION_PROMPT],
+      ["system", EXPLORE_PROMPT],
       new MessagesPlaceholder("messages"),
     ]);
 
