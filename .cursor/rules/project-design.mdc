@@ -176,6 +176,7 @@ User Request → Schema Agent → Query Builder → Validation Agent →
    - Create testing/evaluation framework for agent performance
    - Vectorization of query intents
    - advanced admin UI with prompt editing, storage browsing, metrics
+   - edit/replace/reset core prompts
 
 ## Technical Specifications
 

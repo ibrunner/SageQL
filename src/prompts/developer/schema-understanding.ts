@@ -1,3 +1,7 @@
+/**
+ * Prompts for understanding the schema of the GraphQL API.
+ * Consider these as meta-prompts for developers who are using the API and evaluating the framework.
+ */
 export const schemaUnderstandingPrompts = [
   {
     name: "Main Entities",

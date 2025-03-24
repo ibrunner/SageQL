@@ -6,29 +6,10 @@ import {
   existsSync,
 } from "fs";
 import { join } from "path";
-import { GraphQLSchema } from "graphql";
-import { schemaUnderstandingPrompts } from "../scripts/prompts/schema-understanding.js";
-import { queryGenerationPrompts } from "../scripts/prompts/query-generation.js";
-import { loadLatestSchema } from "./schema.js";
-
+import { schemaUnderstandingPrompts } from "../prompts/developer/schema-understanding.js";
+import { queryGenerationPrompts } from "../prompts/developer/query-generation.js";
+import { QUERY_BUILDER_PROMPT } from "../prompts/agent/query-builder.js";
 // System prompt for the AI
-export const SYSTEM_PROMPT = `You are an AI assistant specialized in helping users interact with GraphQL APIs.
-Your role is to:
-1. Understand the GraphQL schema provided to you
-2. Help users formulate queries and understand the API
-3. Generate appropriate GraphQL queries based on user requests
-4. Explain query results in a clear, concise manner
-
-You have access to the complete GraphQL schema through the introspection query results.
-Always validate queries against the schema before suggesting them.
-If a user's request is unclear, ask for clarification.
-
-When generating queries:
-1. Use proper GraphQL syntax
-2. Include only the fields that are explicitly requested
-3. Handle relationships appropriately
-4. Consider pagination for large result sets
-5. Validate the query against the schema before returning it`;
 
 // Combine all sample prompts
 export const ALL_SAMPLE_PROMPTS = [
@@ -141,18 +122,15 @@ export function getPromptByName(name: string): Prompt | undefined {
   return ALL_SAMPLE_PROMPTS.find((p) => p.name === name);
 }
 
-export function generateChatMessages(
+export async function generateChatMessages(
   prompt: string,
   schema: string,
-): ChatMessage[] {
+): Promise<ChatMessage[]> {
+  const formattedPrompt = await QUERY_BUILDER_PROMPT.format({ schema });
   return [
     {
       role: "system",
-      content: SYSTEM_PROMPT,
-    },
-    {
-      role: "system",
-      content: `Here is the GraphQL schema:\n${schema}`,
+      content: formattedPrompt,
     },
     {
       role: "user",

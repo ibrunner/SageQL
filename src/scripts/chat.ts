@@ -20,7 +20,7 @@ async function chat(prompt: string, verbose = false) {
   try {
     // Load the introspection schema
     const schema = await loadLatestSchema();
-    const messages = generateChatMessages(prompt, schema);
+    const messages = await generateChatMessages(prompt, schema);
 
     if (verbose) {
       console.log("Messages being sent to LLM:", messages);
@@ -52,7 +52,7 @@ async function main() {
   }
 
   const schema = await loadLatestSchema();
-  const messages = generateChatMessages(selectedPrompt.prompt, schema);
+  const messages = await generateChatMessages(selectedPrompt.prompt, schema);
   const response = await chat(selectedPrompt.prompt, options.verbose);
 
   if (options.logOutput) {

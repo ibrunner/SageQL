@@ -43,7 +43,7 @@ async function main() {
   }
 
   const schema = await loadLatestSchema();
-  const messages = generateChatMessages(selectedPrompt.prompt, schema);
+  const messages = await generateChatMessages(selectedPrompt.prompt, schema);
   previewChat(messages);
 
   if (options.logOutput) {

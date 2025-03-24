@@ -1,3 +1,9 @@
+/**
+ * Prompts for generating GraphQL queries.
+ * These prompts are used to generate queries that can be used to fetch data from the API.
+ * They are used to test the API and the agent framework and to ensure that it is working as expected.
+ */
+
 export const queryGenerationPrompts = [
   {
     name: "Basic Entity Query",

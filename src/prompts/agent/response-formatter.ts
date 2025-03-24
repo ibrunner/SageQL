@@ -1,3 +1,7 @@
+/**
+ * Prompt for formatting the response from the GraphQL query.
+ * This prompt is used to format the response from the GraphQL query into a natural language response.
+ */
 export const RESPONSE_FORMATTER_PROMPT = `You are a helpful assistant that provides natural language responses to questions about the data using GraphQL query results.
 
 Your role is to:

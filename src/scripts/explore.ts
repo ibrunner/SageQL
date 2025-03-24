@@ -9,7 +9,7 @@ import {
 } from "@langchain/core/prompts";
 import { HumanMessage } from "@langchain/core/messages";
 import { z } from "zod";
-import { RESPONSE_FORMATTER_PROMPT } from "./prompts/response-formatter.js";
+import { RESPONSE_FORMATTER_PROMPT } from "../prompts/agent/response-formatter.js";
 
 config();
 
