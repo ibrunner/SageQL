@@ -1,6 +1,5 @@
 import { config } from "dotenv";
 import {
-  ALL_SAMPLE_PROMPTS,
   generateChatMessages,
   type ChatMessage,
   parseChatOptions,

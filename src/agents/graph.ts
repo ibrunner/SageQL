@@ -2,7 +2,6 @@ import { RunnableSequence } from "@langchain/core/runnables";
 import { QueryBuilderAgent } from "./query-builder.js";
 import { GraphQLExecutorTool } from "../tools/graphql-executor.js";
 import { QueryValidatorTool } from "../tools/query-validator.js";
-import { GraphQLSchema } from "graphql";
 
 export interface GraphState {
   messages: string[];

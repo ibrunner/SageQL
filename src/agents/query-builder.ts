@@ -7,10 +7,7 @@ import { BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { GraphQLSchema, parse, validate, buildClientSchema } from "graphql";
 import { config } from "dotenv";
 import { z } from "zod";
-import {
-  QUERY_BUILDER_PROMPT,
-  QUERY_BUILDER_PROMPT_TEMPLATE,
-} from "../prompts/agent/query-builder.js";
+import { QUERY_BUILDER_PROMPT_TEMPLATE } from "../prompts/agent/query-builder.js";
 // Load environment variables
 config();
 
