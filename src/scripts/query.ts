@@ -2,7 +2,10 @@ import { config } from "dotenv";
 import { createQueryChain } from "../workflows/chain.js";
 import { ChainState } from "../workflows/chain.js";
 import { loadLatestSchema } from "../lib/schema.js";
-import { runQueryWithRetry } from "../agents/runQueryWithRetry.js";
+import {
+  runQueryWithRetry,
+  getMessageString,
+} from "../agents/runQueryWithRetry.js";
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
@@ -10,6 +13,7 @@ import {
 import { HumanMessage } from "@langchain/core/messages";
 import { llmEnv, llmModel } from "../lib/llmClient.js";
 import { RESPONSE_FORMATTER_PROMPT } from "../agents/prompts/responseFormatter.js";
+import { logger } from "@/lib/logger.js";
 
 config();
 
@@ -24,25 +28,23 @@ config();
  */
 async function main() {
   try {
-    const { query, verbose } = parseArgs();
+    const { query } = parseArgs();
 
-    if (verbose) {
-      console.log("\n=== Starting Query Process ===");
-      console.log("Input query:", query);
-    }
+    logger.debug("\n=== Starting Query Process ===");
+    logger.debug("Input query:", query);
 
     // Load the schema
-    if (verbose) console.log("\n=== Loading Schema ===");
+    logger.debug("\n=== Loading Schema ===");
     const schemaJson = loadLatestSchema();
-    if (verbose) console.log("Schema JSON loaded successfully");
+    logger.debug("Schema JSON loaded successfully");
 
     // Create the query graph
-    if (verbose) console.log("\n=== Creating Query Graph ===");
-    const chain = await createQueryChain(llmEnv.GRAPHQL_API_URL, verbose);
-    if (verbose) console.log("Query chain created successfully");
+    logger.debug("\n=== Creating Query Graph ===");
+    const chain = await createQueryChain(llmEnv.GRAPHQL_API_URL);
+    logger.debug("Query chain created successfully");
 
     // Initialize the graph state
-    if (verbose) console.log("\n=== Initializing Graph State ===");
+    logger.debug("\n=== Initializing Graph State ===");
     const initialState: ChainState = {
       messages: [query],
       schema: schemaJson,
@@ -50,16 +52,15 @@ async function main() {
       validationErrors: [],
       executionResult: null,
     };
-    if (verbose)
-      console.log("Initial state:", JSON.stringify(initialState, null, 2));
+    logger.debug("Initial state:", JSON.stringify(initialState, null, 2));
 
     // Run the graph
-    if (verbose) console.log("\n=== Running Query Graph ===");
-    const result = await runQueryWithRetry(chain, initialState, 3, verbose);
-    if (verbose) console.log("Graph execution completed");
+    logger.debug("\n=== Running Query Graph ===");
+    const result = await runQueryWithRetry(chain, initialState, 3);
+    logger.debug("Graph execution completed");
 
     // Generate natural language response
-    if (verbose) console.log("\n=== Generating Natural Language Response ===");
+    logger.debug("\n=== Generating Natural Language Response ===");
 
     const prompt = ChatPromptTemplate.fromMessages([
       ["system", RESPONSE_FORMATTER_PROMPT],
@@ -75,25 +76,25 @@ async function main() {
     );
 
     // Output the results
-    console.log("\n=== Results ===");
-    console.log("\nGenerated Query:");
-    console.log(result.currentQuery);
+    logger.info("\n=== Results ===");
+    logger.info("\nGenerated Query:");
+    logger.info(result.currentQuery);
 
     if (result.validationErrors?.length) {
-      console.log("\nValidation Errors:");
-      result.validationErrors.forEach((error) => console.log(`- ${error}`));
+      logger.error("\nValidation Errors:");
+      result.validationErrors.forEach((error) => logger.error(`- ${error}`));
     }
 
-    console.log("\nResponse:");
-    console.log(response.content);
+    logger.info("\nResponse:");
+    logger.info(getMessageString(response.content));
   } catch (error: unknown) {
-    console.error("\n=== Error Occurred ===");
+    logger.error("\n=== Error Occurred ===");
     if (error instanceof Error) {
-      console.error("Error name:", error.name);
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
+      logger.error("Error name:", error.name);
+      logger.error("Error message:", error.message);
+      logger.error("Error stack:", error.stack);
     } else {
-      console.error("Unknown error:", error);
+      logger.error("Unknown error:", error);
     }
     process.exit(1);
   }
@@ -103,13 +104,11 @@ main();
 
 /**
  * Parses command line arguments for the query script
- * @returns {Object} Object containing the query string and verbose flag
+ * @returns {Object} Object containing the query string
  * @property {string} query - The GraphQL query to execute
- * @property {boolean} verbose - Flag indicating whether to output verbose logs
  */
 function parseArgs() {
   const args = process.argv.slice(2);
-  const verbose = args.includes("--verbose");
   const query = args.find((arg) => !arg.startsWith("--"));
 
   if (!query) {
@@ -117,5 +116,5 @@ function parseArgs() {
     process.exit(1);
   }
 
-  return { query, verbose };
+  return { query };
 }

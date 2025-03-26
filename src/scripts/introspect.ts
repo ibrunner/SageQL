@@ -8,7 +8,7 @@ import {
   ApolloError,
 } from "@apollo/client/core";
 import { z } from "zod";
-
+import { logger } from "@/lib/logger.js";
 // Load environment variables
 config();
 
@@ -130,43 +130,43 @@ const INTROSPECTION_QUERY = gql`
  */
 async function fetchIntrospection() {
   try {
-    console.log("Fetching GraphQL schema...");
-    console.log("Request URL:", env.GRAPHQL_API_URL);
+    logger.debug("Fetching GraphQL schema...");
+    logger.debug("Request URL:", env.GRAPHQL_API_URL);
 
     const { data } = await client.query({
       query: INTROSPECTION_QUERY,
     });
 
     // Log detailed schema information
-    console.log("\nSchema Information:");
-    console.log("Query Type:", data.__schema.queryType?.name);
-    console.log("Mutation Type:", data.__schema.mutationType?.name);
-    console.log("Subscription Type:", data.__schema.subscriptionType?.name);
-    console.log("Number of Types:", data.__schema.types.length);
-    console.log("Number of Directives:", data.__schema.directives.length);
+    logger.debug("\nSchema Information:");
+    logger.debug("Query Type:", data.__schema.queryType?.name);
+    logger.debug("Mutation Type:", data.__schema.mutationType?.name);
+    logger.debug("Subscription Type:", data.__schema.subscriptionType?.name);
+    logger.debug("Number of Types:", data.__schema.types.length);
+    logger.debug("Number of Directives:", data.__schema.directives.length);
 
     // Log all types
-    console.log("\nTypes:");
+    logger.debug("\nTypes:");
     data.__schema.types.forEach((type: any) => {
       if (type.name && !type.name.startsWith("__")) {
-        console.log(`- ${type.name} (${type.kind})`);
+        logger.debug(`- ${type.name} (${type.kind})`);
         if (type.description) {
-          console.log(`  Description: ${type.description}`);
+          logger.debug(`  Description: ${type.description}`);
         }
         if (type.fields) {
-          console.log(`  Fields: ${type.fields.length}`);
+          logger.debug(`  Fields: ${type.fields.length}`);
         }
       }
     });
 
     // Log all directives
-    console.log("\nDirectives:");
+    logger.debug("\nDirectives:");
     data.__schema.directives.forEach((directive: any) => {
-      console.log(`- ${directive.name}`);
+      logger.debug(`- ${directive.name}`);
       if (directive.description) {
-        console.log(`  Description: ${directive.description}`);
+        logger.debug(`  Description: ${directive.description}`);
       }
-      console.log(`  Locations: ${directive.locations.join(", ")}`);
+      logger.debug(`  Locations: ${directive.locations.join(", ")}`);
     });
 
     // Generate timestamped filename
@@ -179,7 +179,7 @@ async function fetchIntrospection() {
     // Save schema file
     try {
       await writeFile(outputFile, JSON.stringify(data, null, 2));
-      console.log(`\nSchema saved to ${outputFile}`);
+      logger.debug(`\nSchema saved to ${outputFile}`);
     } catch (error) {
       console.error("Error saving schema file:", error);
       throw error;

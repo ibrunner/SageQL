@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { config } from "dotenv";
 import { z } from "zod";
+import { logger } from "./logger.js";
 
 // Load environment variables
 config();
@@ -45,7 +46,7 @@ export function loadLatestSchema(): string {
 
   const latestSchema = schemaFiles[0];
   const schemaPath = join(outputsDir, latestSchema);
-  console.log(`Using schema from: ${latestSchema}`);
+  logger.debug(`Using schema from: ${latestSchema}`);
 
   return readFileSync(schemaPath, "utf-8");
 }

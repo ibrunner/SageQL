@@ -6,29 +6,28 @@ import { schemaUnderstandingPrompts } from "./prompts/schemaUnderstanding.js";
 import { queryGenerationPrompts } from "./prompts/queryGeneration.js";
 import { QUERY_BUILDER_PROMPT } from "../agents/prompts/queryBuilder.js";
 import { llmModel, llmEnv } from "../lib/llmClient.js";
+import { logger } from "@/lib/logger.js";
 
 // Load environment variables
 config();
 
-async function chat(prompt: string, verbose = false) {
+async function chat(prompt: string) {
   try {
     // Load the introspection schema
     const schema = await loadLatestSchema();
     const messages = await generateChatMessages(prompt, schema);
 
-    if (verbose) {
-      console.log("Messages being sent to LLM:", messages);
-    }
+    logger.debug("Messages being sent to LLM:", messages);
 
     // Get completion using the generic chat client
     const completion = await chatWithClient(messages);
 
     const response =
       completion.choices[0]?.message?.content?.toString() || undefined;
-    console.log("\nAI Response:", response);
+    logger.info("\nAI Response:", response);
     return response;
   } catch (error) {
-    console.error("Error in chat:", error);
+    logger.error("Error in chat:", error);
     throw error;
   }
 }
@@ -44,7 +43,7 @@ async function main() {
 
   const schema = await loadLatestSchema();
   const messages = await generateChatMessages(selectedPrompt.prompt, schema);
-  const response = await chat(selectedPrompt.prompt, options.verbose);
+  const response = await chat(selectedPrompt.prompt);
 
   if (options.logOutput) {
     logChatOutput("chat", messages, response);
@@ -73,7 +72,6 @@ export interface ChatMessage {
 }
 
 export interface ChatOptions {
-  verbose?: boolean;
   listPrompts?: boolean;
   promptName?: string;
   logOutput?: boolean;
@@ -84,14 +82,13 @@ export interface ChatOptions {
  * @returns {ChatOptions} Object containing parsed chat options
  */
 export function parseChatOptions(): ChatOptions {
-  const verbose = process.argv.includes("--verbose");
   const listPrompts = process.argv.includes("--list");
   const logOutput = process.argv.includes("--log");
   const promptName = process.argv
     .find((arg) => arg.startsWith("--prompt="))
     ?.split("=")[1];
 
-  return { verbose, listPrompts, promptName, logOutput };
+  return { listPrompts, promptName, logOutput };
 }
 
 /**
@@ -103,8 +100,8 @@ export function handlePromptSelection(
   options: ChatOptions,
 ): Prompt | undefined {
   if (options.listPrompts) {
-    console.log("Available prompts:");
-    ALL_SAMPLE_PROMPTS.forEach((p) => console.log(`- ${p.name}`));
+    logger.debug("Available prompts:");
+    ALL_SAMPLE_PROMPTS.forEach((p) => logger.debug(`- ${p.name}`));
     return undefined;
   }
 
@@ -119,10 +116,10 @@ export function handlePromptSelection(
     return undefined;
   }
 
-  if (options.verbose && selectedPrompt) {
-    console.log("Selected prompt:", selectedPrompt.name);
-    console.log("Prompt text:", selectedPrompt.prompt);
-    console.log("Expected output:", selectedPrompt.expected);
+  if (selectedPrompt) {
+    logger.debug("Selected prompt:", selectedPrompt.name);
+    logger.debug("Prompt text:", selectedPrompt.prompt);
+    logger.debug("Expected output:", selectedPrompt.expected);
   }
 
   return selectedPrompt;
@@ -203,7 +200,7 @@ export function logChatOutput(
   const filename = `${type}-${timestamp}.json`;
   const filepath = join(outputsDir, filename);
   writeFileSync(filepath, JSON.stringify(output, null, 2));
-  console.log(`\nLogged output to: ${filename}`);
+  logger.info(`\nLogged output to: ${filename}`);
 }
 
 /**

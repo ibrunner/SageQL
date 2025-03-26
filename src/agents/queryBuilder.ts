@@ -7,6 +7,7 @@ import { BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { GraphQLSchema, parse, validate, buildClientSchema } from "graphql";
 import { llmModel } from "../lib/llmClient.js";
 import { QUERY_BUILDER_PROMPT_TEMPLATE } from "./prompts/queryBuilder.js";
+import { logger } from "../lib/logger.js";
 
 export interface QueryBuilderState {
   messages: BaseMessage[];
@@ -17,7 +18,6 @@ export interface QueryBuilderState {
 
 export interface QueryBuilderConfig {
   model?: ChatOpenAI;
-  verbose?: boolean;
 }
 
 export interface QueryResult {
@@ -75,39 +75,30 @@ export const createQueryBuilderPrompt = () => {
   ]);
 };
 
-const logDebug = (verbose: boolean, message: string, data?: any) => {
-  if (verbose) {
-    console.log(message);
-    if (data !== undefined) {
-      console.log(data);
-    }
-  }
-};
-
 export const generateQuery = async (
   request: string,
   schema: string,
   config: QueryBuilderConfig = {},
 ): Promise<QueryResult> => {
-  const { model = llmModel, verbose = false } = config;
+  const { model = llmModel } = config;
   const prompt = createQueryBuilderPrompt();
 
-  logDebug(verbose, "\n=== Generating Query ===");
-  logDebug(verbose, "Request:", request);
-  logDebug(verbose, "Schema:", schema);
+  logger.debug("\n=== Generating Query ===");
+  logger.debug("Request:", request);
+  logger.debug("Schema:", schema);
 
   // Format the prompt
-  logDebug(verbose, "\n=== Invoking Model ===");
+  logger.debug("\n=== Invoking Model ===");
   const formattedPrompt = await prompt.format({
     schema,
     messages: [new HumanMessage(request)],
   });
-  logDebug(verbose, "Formatted prompt:", formattedPrompt);
+  logger.debug("Formatted prompt:", formattedPrompt);
 
   // Get response from model
   const response = await model.invoke(formattedPrompt);
-  logDebug(verbose, "Model execution completed");
-  logDebug(verbose, "Raw response:", response);
+  logger.debug("Model execution completed");
+  logger.debug("Raw response:", response);
 
   // Extract the query from the response
   const extractedQuery = extractGraphQLQuery(
@@ -115,14 +106,14 @@ export const generateQuery = async (
       ? response.content
       : JSON.stringify(response.content),
   );
-  logDebug(verbose, "Extracted query:", extractedQuery);
+  logger.debug("Extracted query:", extractedQuery);
 
   // Parse the schema for validation
   const parsedSchema = buildClientSchema(JSON.parse(schema));
 
   // Validate the extracted query
   const validation = validateGraphQLQuery(extractedQuery, parsedSchema);
-  logDebug(verbose, "Validation result:", validation);
+  logger.debug("Validation result:", validation);
 
   return {
     query: extractedQuery,

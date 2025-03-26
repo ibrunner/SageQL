@@ -10,11 +10,13 @@ import { HumanMessage } from "@langchain/core/messages";
 import { llmModel, llmEnv } from "../lib/llmClient.js";
 import { RESPONSE_FORMATTER_PROMPT } from "../agents/prompts/responseFormatter.js";
 import { EXPLORE_PROMPT } from "./prompts/explore.js";
+import { logger } from "../lib/logger.js";
+import { getMessageString } from "../agents/runQueryWithRetry.js";
+
 config();
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const verbose = args.includes("--verbose");
   const numQueries = parseInt(
     args.find((arg) => arg.startsWith("--queries="))?.split("=")[1] || "3",
   );
@@ -24,38 +26,35 @@ function parseArgs() {
     process.exit(1);
   }
 
-  return { verbose, numQueries };
+  return { numQueries };
 }
 
 async function runQueryWithRetry(
   graph: any,
   initialState: ChainState,
   maxRetries: number = 3,
-  verbose: boolean = false,
 ): Promise<ChainState> {
   let currentState = initialState;
   let attempt = 1;
 
   while (attempt <= maxRetries) {
-    if (verbose) {
-      console.log(`\n=== Attempt ${attempt}/${maxRetries} ===`);
-      if (attempt > 1) {
-        console.log("Previous query:", currentState.currentQuery);
-        console.log("Previous errors:", currentState.validationErrors);
-      }
+    logger.debug(`\n=== Attempt ${attempt}/${maxRetries} ===`);
+    if (attempt > 1) {
+      logger.debug("Previous query:", currentState.currentQuery);
+      logger.debug("Previous errors:", currentState.validationErrors);
     }
 
     try {
       const result = await graph.invoke(currentState);
 
       if (result.validationErrors?.length) {
-        console.log("\nValidation Errors:");
+        logger.error("\nValidation Errors:");
         result.validationErrors.forEach((error: string) =>
-          console.log(`- ${error}`),
+          logger.error(`- ${error}`),
         );
 
         if (attempt < maxRetries) {
-          console.log("\nRetrying with updated context...");
+          logger.info("\nRetrying with updated context...");
           currentState = {
             ...currentState,
             messages: [
@@ -73,15 +72,15 @@ async function runQueryWithRetry(
 
       return result;
     } catch (error) {
-      console.log("\nExecution Error:");
+      logger.error("\nExecution Error:");
       if (error instanceof Error) {
-        console.log(`- ${error.message}`);
+        logger.error(`- ${error.message}`);
       } else {
-        console.log(`- ${error}`);
+        logger.error(`- ${error}`);
       }
 
       if (attempt < maxRetries) {
-        console.log("\nRetrying with updated context...");
+        logger.info("\nRetrying with updated context...");
         currentState = {
           ...currentState,
           messages: [
@@ -104,22 +103,20 @@ async function runQueryWithRetry(
 
 async function main() {
   try {
-    const { verbose, numQueries } = parseArgs();
+    const { numQueries } = parseArgs();
 
-    if (verbose) {
-      console.log("\n=== Starting API Exploration ===");
-      console.log(`Number of queries to generate: ${numQueries}`);
-    }
+    logger.info("\n=== Starting API Exploration ===");
+    logger.info(`Number of queries to generate: ${numQueries}`);
 
     // Load the schema
-    if (verbose) console.log("\n=== Loading Schema ===");
+    logger.info("\n=== Loading Schema ===");
     const schemaJson = loadLatestSchema();
-    if (verbose) console.log("Schema JSON loaded successfully");
+    logger.info("Schema JSON loaded successfully");
 
     // Create the query graph
-    if (verbose) console.log("\n=== Creating Query Graph ===");
-    const graph = await createQueryChain(llmEnv.GRAPHQL_API_URL, verbose);
-    if (verbose) console.log("Query graph created successfully");
+    logger.info("\n=== Creating Query Graph ===");
+    const graph = await createQueryChain(llmEnv.GRAPHQL_API_URL);
+    logger.info("Query graph created successfully");
 
     const explorationPrompt = ChatPromptTemplate.fromMessages([
       ["system", EXPLORE_PROMPT],
@@ -128,7 +125,7 @@ async function main() {
 
     // Generate and execute queries
     for (let i = 0; i < numQueries; i++) {
-      console.log(`\n=== Query ${i + 1}/${numQueries} ===`);
+      logger.info(`\n=== Query ${i + 1}/${numQueries} ===`);
 
       // Generate an interesting query
       const explorationResponse = await llmModel.invoke(
@@ -149,7 +146,7 @@ async function main() {
       };
 
       // Run the query
-      const result = await runQueryWithRetry(graph, initialState, 3, verbose);
+      const result = await runQueryWithRetry(graph, initialState, 3);
 
       // Format the response using the existing formatter
       const responsePrompt = ChatPromptTemplate.fromMessages([
@@ -166,27 +163,27 @@ async function main() {
       );
 
       // Output the results
-      console.log("\nGenerated Query:");
-      console.log(result.currentQuery);
+      logger.info("\nGenerated Query:");
+      logger.info(result.currentQuery);
 
       if (result.validationErrors?.length) {
-        console.log("\nValidation Errors:");
+        logger.info("\nValidation Errors:");
         result.validationErrors.forEach((error: string) =>
-          console.log(`- ${error}`),
+          logger.info(`- ${error}`),
         );
       }
 
-      console.log("\nResponse:");
-      console.log(formattedResponse.content);
+      logger.info("\nResponse:");
+      logger.info(getMessageString(formattedResponse.content));
     }
   } catch (error: unknown) {
-    console.error("\n=== Error Occurred ===");
+    logger.error("\n=== Error Occurred ===");
     if (error instanceof Error) {
-      console.error("Error name:", error.name);
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
+      logger.error("Error name:", error.name);
+      logger.error("Error message:", error.message);
+      logger.error("Error stack:", error.stack);
     } else {
-      console.error("Unknown error:", error);
+      logger.error("Unknown error:", error);
     }
     process.exit(1);
   }
