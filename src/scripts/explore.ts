@@ -1,6 +1,6 @@
 import { config } from "dotenv";
-import { createQueryGraph } from "../agents/graph.js";
-import { GraphState } from "../agents/graph.js";
+import { createQueryChain } from "../agents/chain.js";
+import { GraphState } from "../agents/chain.js";
 import { loadLatestSchema } from "../lib/schema.js";
 import { ChatOpenAI } from "@langchain/openai";
 import {
@@ -130,7 +130,7 @@ async function main() {
 
     // Create the query graph
     if (verbose) console.log("\n=== Creating Query Graph ===");
-    const graph = await createQueryGraph(env.GRAPHQL_API_URL, verbose);
+    const graph = await createQueryChain(env.GRAPHQL_API_URL, verbose);
     if (verbose) console.log("Query graph created successfully");
 
     // Initialize the exploration model
@@ -193,7 +193,9 @@ async function main() {
 
       if (result.validationErrors?.length) {
         console.log("\nValidation Errors:");
-        result.validationErrors.forEach((error) => console.log(`- ${error}`));
+        result.validationErrors.forEach((error: string) =>
+          console.log(`- ${error}`),
+        );
       }
 
       console.log("\nResponse:");

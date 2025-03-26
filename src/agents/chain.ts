@@ -3,7 +3,7 @@ import { QueryBuilderAgent } from "./query-builder.js";
 import { GraphQLExecutorTool } from "../tools/graphql-executor.js";
 import { QueryValidatorTool } from "../tools/query-validator.js";
 
-export interface GraphState {
+export interface ChainState {
   messages: string[];
   schema: string;
   currentQuery: string;
@@ -11,7 +11,7 @@ export interface GraphState {
   executionResult: any;
 }
 
-export async function createQueryGraph(
+export async function createQueryChain(
   apiUrl: string,
   verbose: boolean = false,
 ): Promise<RunnableSequence> {
@@ -26,7 +26,7 @@ export async function createQueryGraph(
   // Create the graph
   const graph = RunnableSequence.from([
     // Query builder step
-    async (state: GraphState) => {
+    async (state: ChainState) => {
       if (verbose) console.log("\n=== Query Builder Step ===");
       const result = await queryBuilder.generateQuery(
         state.messages[state.messages.length - 1],
@@ -39,7 +39,7 @@ export async function createQueryGraph(
       };
     },
     // Validator step
-    async (state: GraphState) => {
+    async (state: ChainState) => {
       if (verbose) console.log("\n=== Query Validator Step ===");
       const result = await validator.call({
         query: state.currentQuery,
@@ -55,7 +55,7 @@ export async function createQueryGraph(
       };
     },
     // Executor step
-    async (state: GraphState) => {
+    async (state: ChainState) => {
       if (verbose) console.log("\n=== Query Executor Step ===");
       if (state.validationErrors?.length > 0) {
         return state;

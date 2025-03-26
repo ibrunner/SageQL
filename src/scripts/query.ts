@@ -1,6 +1,6 @@
 import { config } from "dotenv";
-import { createQueryGraph } from "../agents/graph.js";
-import { GraphState } from "../agents/graph.js";
+import { createQueryGraph } from "../agents/chain.js";
+import { GraphState } from "../agents/chain.js";
 import { loadLatestSchema } from "../lib/schema.js";
 import { ChatOpenAI } from "@langchain/openai";
 import {
