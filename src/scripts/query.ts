@@ -24,6 +24,12 @@ const envSchema = z.object({
 // Validate environment variables
 const env = envSchema.parse(process.env);
 
+/**
+ * Parses command line arguments for the query script
+ * @returns {Object} Object containing the query string and verbose flag
+ * @property {string} query - The GraphQL query to execute
+ * @property {boolean} verbose - Flag indicating whether to output verbose logs
+ */
 function parseArgs() {
   const args = process.argv.slice(2);
   const verbose = args.includes("--verbose");
@@ -37,6 +43,15 @@ function parseArgs() {
   return { query, verbose };
 }
 
+/**
+ * Executes a GraphQL query with automatic retry logic for validation errors
+ * @param {any} graph - The LangGraph instance for query execution
+ * @param {GraphState} initialState - Initial state containing query and schema information
+ * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
+ * @param {boolean} verbose - Flag for detailed logging output (default: false)
+ * @returns {Promise<GraphState>} Final state after query execution
+ * @throws {Error} When max retries are reached without successful validation
+ */
 async function runQueryWithRetry(
   graph: any,
   initialState: GraphState,
@@ -234,6 +249,15 @@ async function runQueryWithRetry(
   throw new Error("Max retries reached without successful validation");
 }
 
+/**
+ * Main entry point for the query execution script
+ * Handles the complete workflow of:
+ * - Loading GraphQL schema
+ * - Creating and executing query graph
+ * - Processing results
+ * - Generating natural language response
+ * @throws {Error} If any step in the process fails
+ */
 async function main() {
   try {
     const { query, verbose } = parseArgs();

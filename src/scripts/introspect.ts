@@ -116,6 +116,18 @@ const INTROSPECTION_QUERY = gql`
   }
 `;
 
+/**
+ * Fetches and saves the GraphQL schema introspection data
+ * @async
+ * @throws {ApolloError} When there are GraphQL-related errors during fetching
+ * @throws {Error} When there are file system errors during schema saving
+ * @description
+ * This function:
+ * 1. Queries the GraphQL endpoint for schema introspection
+ * 2. Logs detailed schema information including types and directives
+ * 3. Saves the schema to a timestamped JSON file
+ * 4. Handles and logs various types of errors (network, GraphQL, protocol, client)
+ */
 async function fetchIntrospection() {
   try {
     console.log("Fetching GraphQL schema...");

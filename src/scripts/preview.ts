@@ -11,6 +11,10 @@ import { loadLatestSchema } from "../lib/schema.js";
 // Load environment variables
 config();
 
+/**
+ * Displays a preview of the chat messages including configuration and message details
+ * @param messages - Array of ChatMessage objects containing role and content
+ */
 function previewChat(messages: ChatMessage[]) {
   console.log("\n=== Chat Preview ===");
   console.log("\nConfiguration:");
@@ -32,7 +36,16 @@ function previewChat(messages: ChatMessage[]) {
   );
 }
 
-// Main function to run the preview
+/**
+ * Main execution function that:
+ * 1. Parses chat options
+ * 2. Handles prompt selection
+ * 3. Loads the latest schema
+ * 4. Generates chat messages
+ * 5. Previews the chat
+ * 6. Optionally logs output
+ * @throws Will throw an error if any step fails
+ */
 async function main() {
   const options = parseChatOptions();
   const selectedPrompt = handlePromptSelection(options);

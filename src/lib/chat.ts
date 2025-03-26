@@ -35,6 +35,10 @@ export interface ChatOptions {
   logOutput?: boolean;
 }
 
+/**
+ * Parses command line arguments to extract chat options
+ * @returns {ChatOptions} Object containing parsed chat options
+ */
 export function parseChatOptions(): ChatOptions {
   const verbose = process.argv.includes("--verbose");
   const listPrompts = process.argv.includes("--list");
@@ -46,6 +50,11 @@ export function parseChatOptions(): ChatOptions {
   return { verbose, listPrompts, promptName, logOutput };
 }
 
+/**
+ * Handles prompt selection based on provided options
+ * @param {ChatOptions} options - Configuration options for prompt selection
+ * @returns {Prompt | undefined} Selected prompt or undefined if listing prompts
+ */
 export function handlePromptSelection(
   options: ChatOptions,
 ): Prompt | undefined {
@@ -75,39 +84,6 @@ export function handlePromptSelection(
   return selectedPrompt;
 }
 
-export async function loadIntrospectionSchema(): Promise<string> {
-  try {
-    const outputsDir = join(process.cwd(), "outputs", "graphql");
-    const files = readdirSync(outputsDir);
-
-    // Find all schema files that match the ISO 8601 timestamp pattern
-    const schemaFiles = files.filter((f) => {
-      // Match files like schema-2025-03-17T15-25-40-641Z.json
-      const match = f.match(
-        /^schema-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)\.json$/,
-      );
-      return match !== null;
-    });
-
-    if (schemaFiles.length === 0) {
-      throw new Error(
-        "No timestamped schema files found in outputs/graphql directory",
-      );
-    }
-
-    // Sort by the timestamp in the filename (ISO 8601 format)
-    const latestSchema = schemaFiles.sort().reverse()[0];
-    const schemaPath = join(outputsDir, latestSchema);
-
-    console.log(`Loading schema from: ${latestSchema}`);
-    const schema = readFileSync(schemaPath, "utf-8");
-    return schema;
-  } catch (error) {
-    console.error("Error loading introspection schema:", error);
-    throw error;
-  }
-}
-
 export function getRandomPrompt(): Prompt {
   const randomIndex = Math.floor(Math.random() * ALL_SAMPLE_PROMPTS.length);
   const prompt = ALL_SAMPLE_PROMPTS[randomIndex];
@@ -122,6 +98,12 @@ export function getPromptByName(name: string): Prompt | undefined {
   return ALL_SAMPLE_PROMPTS.find((p) => p.name === name);
 }
 
+/**
+ * Generates chat messages by combining the system prompt with user input
+ * @param {string} prompt - User input prompt
+ * @param {string} schema - GraphQL schema string
+ * @returns {Promise<ChatMessage[]>} Array of formatted chat messages
+ */
 export async function generateChatMessages(
   prompt: string,
   schema: string,
@@ -139,12 +121,22 @@ export async function generateChatMessages(
   ];
 }
 
+/**
+ * Ensures the specified output directory exists
+ * @param {string} dir - Directory path to check/create
+ */
 export function ensureOutputDir(dir: string) {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
 }
 
+/**
+ * Logs chat interaction details to a JSON file
+ * @param {"preview" | "chat"} type - Type of output being logged
+ * @param {ChatMessage[]} messages - Array of chat messages
+ * @param {string} [response] - Optional response content
+ */
 export function logChatOutput(
   type: "preview" | "chat",
   messages: ChatMessage[],
@@ -170,7 +162,9 @@ export function logChatOutput(
   console.log(`\nLogged output to: ${filename}`);
 }
 
-// Chat client interface
+/**
+ * Interface for chat client implementations
+ */
 interface ChatClient {
   chat(
     messages: ChatMessage[],
@@ -184,16 +178,30 @@ interface ChatClient {
   }>;
 }
 
-// OpenAI/Claude compatible client
+/**
+ * OpenAI/Claude compatible API client implementation
+ */
 class OpenAIClient implements ChatClient {
   private baseURL: string;
   private apiKey: string;
 
+  /**
+   * Creates a new OpenAI API client
+   * @param {string} baseURL - Base URL for the API
+   * @param {string} apiKey - API authentication key
+   */
   constructor(baseURL: string, apiKey: string) {
     this.baseURL = baseURL;
     this.apiKey = apiKey;
   }
 
+  /**
+   * Sends a chat completion request to the API
+   * @param {ChatMessage[]} messages - Array of chat messages
+   * @param {string} model - Model identifier to use
+   * @returns {Promise<any>} API response
+   * @throws {Error} If the API request fails
+   */
   async chat(messages: ChatMessage[], model: string) {
     const response = await fetch(`${this.baseURL}/chat/completions`, {
       method: "POST",
@@ -216,63 +224,23 @@ class OpenAIClient implements ChatClient {
   }
 }
 
-// Ollama compatible client
-class OllamaClient implements ChatClient {
-  private baseURL: string;
-
-  constructor(baseURL: string) {
-    this.baseURL = baseURL;
-  }
-
-  async chat(messages: ChatMessage[], model: string) {
-    const prompt = messages
-      .map((msg) => `${msg.role}: ${msg.content}`)
-      .join("\n\n");
-
-    const response = await fetch(this.baseURL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        prompt,
-        stream: false,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return {
-      choices: [
-        {
-          message: {
-            content: data.response,
-          },
-        },
-      ],
-    };
-  }
-}
-
-// Factory function to create the appropriate client
+/**
+ * Creates a chat client instance using environment configuration
+ * @returns {ChatClient} Configured chat client instance
+ */
 export function createChatClient(): ChatClient {
   const baseURL = process.env.OPENAI_API_BASE || "";
   const apiKey = process.env.OPENAI_API_KEY || "";
-
-  // Check if we're using Ollama (by checking if the base URL contains /api/generate)
-  if (baseURL.includes("/api/generate")) {
-    return new OllamaClient(baseURL);
-  }
-
-  // Default to OpenAI/Claude compatible client
   return new OpenAIClient(baseURL, apiKey);
 }
 
-// Generic chat function that works with any client
+/**
+ * Sends chat messages using the provided client
+ * @param {ChatMessage[]} messages - Array of chat messages
+ * @param {string} model - Model identifier to use
+ * @param {ChatClient} client - Chat client instance
+ * @returns {Promise<any>} Chat completion response
+ */
 export async function chatWithClient(
   messages: ChatMessage[],
   model: string,
