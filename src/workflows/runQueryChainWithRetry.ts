@@ -1,19 +1,19 @@
-import { ChainState } from "../workflows/chain.js";
+import { ChainState } from "./chain.js";
 import { formatValidationErrors } from "../lib/graphql/errorFormatting.js";
-import { VALIDATION_RETRY_PROMPT } from "./prompts/retryValidation.js";
-import { EXECUTION_RETRY_PROMPT } from "./prompts/retryExecution.js";
+import { VALIDATION_RETRY_PROMPT } from "../agents/prompts/retryValidation.js";
+import { EXECUTION_RETRY_PROMPT } from "../agents/prompts/retryExecution.js";
 import { logger } from "../lib/logger.js";
 import { getMessageString } from "../lib/getMessageString.js";
 
 /**
- * Executes a GraphQL query with automatic retry logic for validation errors
+ * Executes a the langchain chain with automatic retry logic for validation errors
  * @param {any} chain - The LangGraph instance for query execution
  * @param {ChainState} initialState - Initial state containing query and schema information
  * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
  * @returns {Promise<ChainState>} Final state after query execution
  * @throws {Error} When max retries are reached without successful validation
  */
-export async function runQueryWithRetry(
+export async function runQueryChainWithRetry(
   chain: any,
   initialState: ChainState,
   maxRetries: number = 3,
@@ -115,7 +115,7 @@ export async function runQueryWithRetry(
  * @returns {Promise<ChainState>} Final state after query execution
  * @throws {Error} When max retries are reached without successful validation
  */
-export async function runQueryWithRetryOld(
+export async function runQueryChainWithRetryOld(
   graph: any,
   initialState: ChainState,
   maxRetries: number = 3,

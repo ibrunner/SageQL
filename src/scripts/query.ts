@@ -2,10 +2,8 @@ import { config } from "dotenv";
 import { createQueryChain } from "../workflows/chain.js";
 import { ChainState } from "../workflows/chain.js";
 import { loadLatestSchema } from "../lib/schema.js";
-import {
-  runQueryWithRetry,
-  getMessageString,
-} from "../agents/runQueryWithRetry.js";
+import { runQueryChainWithRetry } from "../workflows/runQueryChainWithRetry.js";
+import { getMessageString } from "../lib/getMessageString.js";
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
@@ -56,7 +54,7 @@ async function main() {
 
     // Run the graph
     logger.debug("\n=== Running Query Graph ===");
-    const result = await runQueryWithRetry(chain, initialState, 3);
+    const result = await runQueryChainWithRetry(chain, initialState, 3);
     logger.debug("Graph execution completed");
 
     // Generate natural language response

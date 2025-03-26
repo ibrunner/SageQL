@@ -12,7 +12,7 @@ import { RESPONSE_FORMATTER_PROMPT } from "../agents/prompts/responseFormatter.j
 import { EXPLORE_PROMPT } from "./prompts/explore.js";
 import { logger } from "../lib/logger.js";
 import { getMessageString } from "../lib/getMessageString.js";
-import { runQueryWithRetry } from "../agents/runQueryWithRetry.js";
+import { runQueryChainWithRetry } from "../workflows/runQueryChainWithRetry.js";
 
 config();
 
@@ -75,7 +75,7 @@ async function main() {
       };
 
       // Run the query
-      const result = await runQueryWithRetry(chain, initialState, 3);
+      const result = await runQueryChainWithRetry(chain, initialState, 3);
 
       // Format the response using the existing formatter
       const responsePrompt = ChatPromptTemplate.fromMessages([
