@@ -1,8 +1,9 @@
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
-import { schemaUnderstandingPrompts } from "../../prompts/developer/schema-understanding.js";
-import { queryGenerationPrompts } from "../../prompts/developer/query-generation.js";
+import { schemaUnderstandingPrompts } from "../../prompts/developer/schemaUnderstanding.js";
+import { queryGenerationPrompts } from "../../prompts/developer/queryGeneration.js";
 import { QUERY_BUILDER_PROMPT } from "../../prompts/agent/queryBuilder.js";
+import { llmModel, llmEnv } from "../../lib/llmClient.js";
 // System prompt for the AI
 
 // Combine all sample prompts
@@ -20,6 +21,7 @@ export interface Prompt {
 export interface ChatMessage {
   role: "system" | "user";
   content: string;
+  type?: "system" | "user"; // Added for LangChain compatibility
 }
 
 export interface ChatOptions {
@@ -145,8 +147,8 @@ export function logChatOutput(
     messages,
     response,
     metadata: {
-      model: process.env.OPENAI_MODEL || "claude-3-sonnet-20240229",
-      apiBase: process.env.OPENAI_API_BASE,
+      model: llmEnv.OPENAI_MODEL,
+      apiBase: llmEnv.OPENAI_API_BASE,
     },
   };
 
@@ -157,88 +159,27 @@ export function logChatOutput(
 }
 
 /**
- * Interface for chat client implementations
- */
-interface ChatClient {
-  chat(
-    messages: ChatMessage[],
-    model: string,
-  ): Promise<{
-    choices: Array<{
-      message: {
-        content: string;
-      };
-    }>;
-  }>;
-}
-
-/**
- * OpenAI/Claude compatible API client implementation
- */
-class OpenAIClient implements ChatClient {
-  private baseURL: string;
-  private apiKey: string;
-
-  /**
-   * Creates a new OpenAI API client
-   * @param {string} baseURL - Base URL for the API
-   * @param {string} apiKey - API authentication key
-   */
-  constructor(baseURL: string, apiKey: string) {
-    this.baseURL = baseURL;
-    this.apiKey = apiKey;
-  }
-
-  /**
-   * Sends a chat completion request to the API
-   * @param {ChatMessage[]} messages - Array of chat messages
-   * @param {string} model - Model identifier to use
-   * @returns {Promise<any>} API response
-   * @throws {Error} If the API request fails
-   */
-  async chat(messages: ChatMessage[], model: string) {
-    const response = await fetch(`${this.baseURL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-}
-
-/**
- * Creates a chat client instance using environment configuration
- * @returns {ChatClient} Configured chat client instance
- */
-export function createChatClient(): ChatClient {
-  const baseURL = process.env.OPENAI_API_BASE || "";
-  const apiKey = process.env.OPENAI_API_KEY || "";
-  return new OpenAIClient(baseURL, apiKey);
-}
-
-/**
- * Sends chat messages using the provided client
+ * Sends chat messages using the LangChain ChatOpenAI client
  * @param {ChatMessage[]} messages - Array of chat messages
- * @param {string} model - Model identifier to use
- * @param {ChatClient} client - Chat client instance
  * @returns {Promise<any>} Chat completion response
  */
-export async function chatWithClient(
-  messages: ChatMessage[],
-  model: string,
-  client: ChatClient,
-) {
-  return client.chat(messages, model);
+export async function chatWithClient(messages: ChatMessage[]) {
+  try {
+    const langChainMessages = messages.map((msg) => ({
+      ...msg,
+      type: msg.role, // Map role to type for LangChain
+    }));
+    const response = await llmModel.invoke(langChainMessages);
+    return {
+      choices: [
+        {
+          message: {
+            content: response.content,
+          },
+        },
+      ],
+    };
+  } catch (error) {
+    throw new Error(`LLM error: ${error}`);
+  }
 }

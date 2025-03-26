@@ -1,7 +1,7 @@
 import { RunnableSequence } from "@langchain/core/runnables";
-import { QueryBuilderAgent } from "./query-builder.js";
-import { GraphQLExecutorTool } from "../tools/graphql-executor.js";
-import { QueryValidatorTool } from "../tools/query-validator.js";
+import { QueryBuilderAgent } from "./queryBuilder.js";
+import { GraphQLExecutorTool } from "../tools/graphqlExecutor.js";
+import { QueryValidatorTool } from "../tools/queryValidator.js";
 
 export interface ChainState {
   messages: string[];

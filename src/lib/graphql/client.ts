@@ -32,25 +32,14 @@ export interface GraphQLResponse<T = any> {
 }
 
 /**
- * A client for making GraphQL API requests
+ * Creates a GraphQL client for making API requests
+ * @param url - The GraphQL API endpoint URL. Defaults to the URL from environment variables
+ * @param headers - Headers to include with each request. Defaults to headers from environment variables
  */
-export class GraphQLClient {
-  private url: string;
-  private headers: Record<string, string>;
-
-  /**
-   * Creates a new GraphQL client instance
-   * @param url - The GraphQL API endpoint URL. Defaults to the URL from environment variables
-   * @param headers - Headers to include with each request. Defaults to headers from environment variables
-   */
-  constructor(
-    url: string = env.GRAPHQL_API_URL,
-    headers: Record<string, string> = env.GRAPHQL_API_HEADERS,
-  ) {
-    this.url = url;
-    this.headers = headers;
-  }
-
+export const createGraphQLClient = (
+  url: string = env.GRAPHQL_API_URL,
+  headers: Record<string, string> = env.GRAPHQL_API_HEADERS,
+) => {
   /**
    * Sends a GraphQL request to the API endpoint
    * @template T - The expected type of the response data
@@ -59,14 +48,14 @@ export class GraphQLClient {
    * @returns Promise containing the GraphQL response
    * @throws Error if the HTTP request fails or if GraphQL errors are present in the response
    */
-  async request<T = any>(
+  const request = async <T = any>(
     query: string,
     variables?: Record<string, any>,
-  ): Promise<GraphQLResponse<T>> {
+  ): Promise<GraphQLResponse<T>> => {
     try {
-      const response = await fetch(this.url, {
+      const response = await fetch(url, {
         method: "POST",
-        headers: this.headers,
+        headers,
         body: JSON.stringify({
           query,
           variables,
@@ -88,5 +77,7 @@ export class GraphQLClient {
       console.error("GraphQL request error:", error);
       throw error;
     }
-  }
-}
+  };
+
+  return { request };
+};

@@ -38,8 +38,8 @@ async function main() {
 
     // Create the query graph
     if (verbose) console.log("\n=== Creating Query Graph ===");
-    const graph = await createQueryChain(llmEnv.GRAPHQL_API_URL, verbose);
-    if (verbose) console.log("Query graph created successfully");
+    const chain = await createQueryChain(llmEnv.GRAPHQL_API_URL, verbose);
+    if (verbose) console.log("Query chain created successfully");
 
     // Initialize the graph state
     if (verbose) console.log("\n=== Initializing Graph State ===");
@@ -55,7 +55,7 @@ async function main() {
 
     // Run the graph
     if (verbose) console.log("\n=== Running Query Graph ===");
-    const result = await runQueryWithRetry(graph, initialState, 3, verbose);
+    const result = await runQueryWithRetry(chain, initialState, 3, verbose);
     if (verbose) console.log("Graph execution completed");
 
     // Generate natural language response

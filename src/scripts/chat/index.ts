@@ -5,16 +5,12 @@ import {
   handlePromptSelection,
   type ChatMessage,
   logChatOutput,
-  createChatClient,
   chatWithClient,
 } from "./chat.js";
 import { loadLatestSchema } from "../../lib/schema.js";
 
 // Load environment variables
 config();
-
-// Initialize the chat client
-const chatClient = createChatClient();
 
 async function chat(prompt: string, verbose = false) {
   try {
@@ -27,13 +23,10 @@ async function chat(prompt: string, verbose = false) {
     }
 
     // Get completion using the generic chat client
-    const completion = await chatWithClient(
-      messages,
-      process.env.OPENAI_MODEL || "claude-3-sonnet-20240229",
-      chatClient,
-    );
+    const completion = await chatWithClient(messages);
 
-    const response = completion.choices[0]?.message?.content || undefined;
+    const response =
+      completion.choices[0]?.message?.content?.toString() || undefined;
     console.log("\nAI Response:", response);
     return response;
   } catch (error) {

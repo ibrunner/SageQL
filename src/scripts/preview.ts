@@ -44,7 +44,7 @@ main().catch(console.error);
 function previewChat(messages: ChatMessage[]) {
   console.log("\n=== Chat Preview ===");
   console.log("\nConfiguration:");
-  console.log("Model:", process.env.OPENAI_MODEL || "claude-3-sonnet-20240229");
+  console.log("Model:", process.env.OPENAI_MODEL);
   console.log("API Base:", process.env.OPENAI_API_BASE);
   console.log("\nMessages:");
 
