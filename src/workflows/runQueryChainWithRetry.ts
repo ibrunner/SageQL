@@ -40,28 +40,10 @@ export async function runQueryChainWithRetry(
 
         if (attempt < maxRetries) {
           logger.info("\nRetrying with updated context...");
-
-          // Add structured validation error handling
-          const { validationContext } = formatValidationErrors(
+          currentState = await handleValidationError(
+            currentState,
             result.validationErrors,
           );
-          const formattedPrompt = await VALIDATION_RETRY_PROMPT.format({
-            validationContext,
-            failedQuery: result.currentQuery,
-            schemaContext: JSON.stringify(currentState.schema, null, 2),
-          });
-
-          logger.debug("\nRetry context being sent to model:");
-          logger.debug(getMessageString(formattedPrompt));
-
-          currentState = {
-            ...currentState,
-            messages: [
-              ...currentState.messages,
-              getMessageString(formattedPrompt.content),
-            ],
-            validationErrors: [],
-          };
           attempt++;
           continue;
         }
@@ -75,86 +57,6 @@ export async function runQueryChainWithRetry(
       } else {
         logger.error(`- ${error}`);
       }
-
-      if (attempt < maxRetries) {
-        logger.info("\nRetrying with updated context...");
-
-        // Add structured execution error handling
-        const formattedPrompt = await EXECUTION_RETRY_PROMPT.format({
-          errorMessage: error instanceof Error ? error.message : String(error),
-          failedQuery: currentState.currentQuery,
-          schemaContext: JSON.stringify(currentState.schema, null, 2),
-        });
-
-        logger.debug("\nRetry context being sent to model:");
-        logger.debug(getMessageString(formattedPrompt));
-
-        currentState = {
-          ...currentState,
-          messages: [
-            ...currentState.messages,
-            getMessageString(formattedPrompt.content),
-          ],
-          validationErrors: [],
-        };
-        attempt++;
-        continue;
-      }
-      throw error;
-    }
-  }
-
-  throw new Error("Max retries reached without successful validation");
-}
-
-/**
- * Executes a GraphQL query with automatic retry logic for validation errors
- * @param {any} graph - The LangGraph instance for query execution
- * @param {QueryChainState} initialState - Initial state containing query and schema information
- * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
- * @returns {Promise<QueryChainState>} Final state after query execution
- * @throws {Error} When max retries are reached without successful validation
- */
-export async function runQueryChainWithRetryOld(
-  graph: any,
-  initialState: QueryChainState,
-  maxRetries: number = 3,
-): Promise<QueryChainState> {
-  let currentState = initialState;
-  let attempt = 1;
-
-  while (attempt <= maxRetries) {
-    logger.debug(`\n=== Attempt ${attempt}/${maxRetries} ===`);
-    if (attempt > 1) {
-      logger.debug("Previous query:", currentState.currentQuery);
-      logger.debug("Previous errors:", currentState.validationErrors);
-      logger.debug("Current messages:", currentState.messages);
-    }
-
-    try {
-      const result = await graph.invoke(currentState);
-
-      if (result.validationErrors?.length > 0) {
-        logger.info("\nValidation Errors:");
-        result.validationErrors.forEach((error: string) =>
-          logger.info(`- ${error}`),
-        );
-
-        if (attempt < maxRetries) {
-          logger.info("\nRetrying with updated context...");
-          currentState = await handleValidationError(
-            currentState,
-            result.validationErrors,
-          );
-          attempt++;
-          continue;
-        }
-      }
-
-      return result;
-    } catch (error) {
-      logger.error("\nExecution Error:");
-      logger.error(`- ${error instanceof Error ? error.message : error}`);
 
       if (attempt < maxRetries) {
         logger.info("\nRetrying with updated context...");
@@ -187,12 +89,12 @@ async function handleValidationError(
   logger.debug("\nRetry context being sent to model:");
   logger.debug(getMessageString(formattedPrompt));
 
-  const firstMessage = currentState.messages[0];
-  const originalQuery = getMessageString(firstMessage);
-
   return {
     ...currentState,
-    messages: [originalQuery, getMessageString(formattedPrompt.content)],
+    messages: [
+      ...currentState.messages,
+      getMessageString(formattedPrompt.content),
+    ],
     validationErrors: [],
   };
 }
@@ -215,12 +117,12 @@ async function handleExecutionError(
   logger.debug("\nRetry context being sent to model:");
   logger.debug(getMessageString(formattedPrompt));
 
-  const firstMessage = currentState.messages[0];
-  const originalQuery = getMessageString(firstMessage);
-
   return {
     ...currentState,
-    messages: [originalQuery, getMessageString(formattedPrompt.content)],
+    messages: [
+      ...currentState.messages,
+      getMessageString(formattedPrompt.content),
+    ],
     validationErrors: [],
   };
 }

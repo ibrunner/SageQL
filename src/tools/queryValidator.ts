@@ -7,6 +7,23 @@ const queryValidatorSchema = z.object({
   schema: z.string().describe("The GraphQL schema JSON to validate against"),
 });
 
+/**
+ * Validates a GraphQL query against a provided schema
+ * @async
+ * @param {Object} input - The input object containing query and schema
+ * @param {string} input.query - The GraphQL query string to validate
+ * @param {string} input.schema - The GraphQL schema JSON string to validate against
+ * @returns {Promise<string>} A JSON string containing validation results
+ *   - isValid: boolean indicating if the query is valid
+ *   - errors: array of error messages if validation fails
+ * @throws Will return error JSON if parsing or validation fails
+ * @example
+ * const result = await queryValidatorTool({
+ *   query: "query { user { id name } }",
+ *   schema: "{...schema JSON...}"
+ * });
+ * // Returns: '{"isValid":true,"errors":[]}'
+ */
 export const queryValidatorTool = tool(
   async (input): Promise<string> => {
     try {

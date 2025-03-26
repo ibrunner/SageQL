@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 import { createQueryChain } from "../workflows/queryChain.js";
-import { ChainState } from "../workflows/queryChain.js";
+import { QueryChainState } from "../workflows/queryChain.js";
 import { loadLatestSchema } from "../lib/schema.js";
 import {
   ChatPromptTemplate,
@@ -66,7 +66,7 @@ async function main() {
       );
 
       // Initialize the graph state
-      const initialState: ChainState = {
+      const initialState: QueryChainState = {
         messages: [explorationResponse.content.toString()],
         schema: schemaJson,
         currentQuery: "",
