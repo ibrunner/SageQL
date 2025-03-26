@@ -1,4 +1,4 @@
-import { ERROR_TEMPLATES } from "../agents/prompts/retryValidation.js";
+import { ERROR_TEMPLATES } from "../../agents/prompts/retryValidation.js";
 
 interface ValidationContext {
   validationContext: string;

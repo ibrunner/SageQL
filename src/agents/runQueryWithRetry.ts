@@ -1,5 +1,5 @@
 import { ChainState } from "../workflows/chain.js";
-import { formatValidationErrors } from "../lib/errorFormatting.js";
+import { formatValidationErrors } from "../lib/graphql/errorFormatting.js";
 import { VALIDATION_RETRY_PROMPT } from "./prompts/retryValidation.js";
 import { EXECUTION_RETRY_PROMPT } from "./prompts/retryExecution.js";
 import { BaseMessage, MessageContent } from "@langchain/core/messages";
