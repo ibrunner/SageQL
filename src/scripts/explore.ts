@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 import { createQueryChain } from "../agents/chain.js";
-import { GraphState } from "../agents/chain.js";
+import { ChainState } from "../agents/chain.js";
 import { loadLatestSchema } from "../lib/schema.js";
 import { ChatOpenAI } from "@langchain/openai";
 import {
@@ -41,10 +41,10 @@ function parseArgs() {
 
 async function runQueryWithRetry(
   graph: any,
-  initialState: GraphState,
+  initialState: ChainState,
   maxRetries: number = 3,
   verbose: boolean = false,
-): Promise<GraphState> {
+): Promise<ChainState> {
   let currentState = initialState;
   let attempt = 1;
 
@@ -162,7 +162,7 @@ async function main() {
       );
 
       // Initialize the graph state
-      const initialState: GraphState = {
+      const initialState: ChainState = {
         messages: [explorationResponse.content.toString()],
         schema: schemaJson,
         currentQuery: "",

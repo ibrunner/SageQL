@@ -1,6 +1,6 @@
 import { config } from "dotenv";
-import { createQueryGraph } from "../agents/chain.js";
-import { GraphState } from "../agents/chain.js";
+import { createQueryChain } from "../agents/chain.js";
+import { ChainState } from "../agents/chain.js";
 import { loadLatestSchema } from "../lib/schema.js";
 import { ChatOpenAI } from "@langchain/openai";
 import {
@@ -46,18 +46,18 @@ function parseArgs() {
 /**
  * Executes a GraphQL query with automatic retry logic for validation errors
  * @param {any} graph - The LangGraph instance for query execution
- * @param {GraphState} initialState - Initial state containing query and schema information
+ * @param {ChainState} initialState - Initial state containing query and schema information
  * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
  * @param {boolean} verbose - Flag for detailed logging output (default: false)
- * @returns {Promise<GraphState>} Final state after query execution
+ * @returns {Promise<ChainState>} Final state after query execution
  * @throws {Error} When max retries are reached without successful validation
  */
 async function runQueryWithRetry(
   graph: any,
-  initialState: GraphState,
+  initialState: ChainState,
   maxRetries: number = 3,
   verbose: boolean = false,
-): Promise<GraphState> {
+): Promise<ChainState> {
   let currentState = initialState;
   let attempt = 1;
 
@@ -274,12 +274,12 @@ async function main() {
 
     // Create the query graph
     if (verbose) console.log("\n=== Creating Query Graph ===");
-    const graph = await createQueryGraph(env.GRAPHQL_API_URL, verbose);
+    const graph = await createQueryChain(env.GRAPHQL_API_URL, verbose);
     if (verbose) console.log("Query graph created successfully");
 
     // Initialize the graph state
     if (verbose) console.log("\n=== Initializing Graph State ===");
-    const initialState: GraphState = {
+    const initialState: ChainState = {
       messages: [query],
       schema: schemaJson,
       currentQuery: "",
