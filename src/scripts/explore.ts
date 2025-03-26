@@ -11,7 +11,8 @@ import { llmModel, llmEnv } from "../lib/llmClient.js";
 import { RESPONSE_FORMATTER_PROMPT } from "../agents/prompts/responseFormatter.js";
 import { EXPLORE_PROMPT } from "./prompts/explore.js";
 import { logger } from "../lib/logger.js";
-import { getMessageString } from "../agents/runQueryWithRetry.js";
+import { getMessageString } from "../lib/getMessageString.js";
+import { runQueryWithRetry } from "../agents/runQueryWithRetry.js";
 
 config();
 
@@ -29,78 +30,6 @@ function parseArgs() {
   return { numQueries };
 }
 
-async function runQueryWithRetry(
-  graph: any,
-  initialState: ChainState,
-  maxRetries: number = 3,
-): Promise<ChainState> {
-  let currentState = initialState;
-  let attempt = 1;
-
-  while (attempt <= maxRetries) {
-    logger.debug(`\n=== Attempt ${attempt}/${maxRetries} ===`);
-    if (attempt > 1) {
-      logger.debug("Previous query:", currentState.currentQuery);
-      logger.debug("Previous errors:", currentState.validationErrors);
-    }
-
-    try {
-      const result = await graph.invoke(currentState);
-
-      if (result.validationErrors?.length) {
-        logger.error("\nValidation Errors:");
-        result.validationErrors.forEach((error: string) =>
-          logger.error(`- ${error}`),
-        );
-
-        if (attempt < maxRetries) {
-          logger.info("\nRetrying with updated context...");
-          currentState = {
-            ...currentState,
-            messages: [
-              ...currentState.messages,
-              `Previous query failed with errors: ${result.validationErrors.join(", ")}`,
-              `Current query was: ${result.currentQuery}`,
-              "Please fix the validation errors and try again",
-            ],
-            validationErrors: [],
-          };
-          attempt++;
-          continue;
-        }
-      }
-
-      return result;
-    } catch (error) {
-      logger.error("\nExecution Error:");
-      if (error instanceof Error) {
-        logger.error(`- ${error.message}`);
-      } else {
-        logger.error(`- ${error}`);
-      }
-
-      if (attempt < maxRetries) {
-        logger.info("\nRetrying with updated context...");
-        currentState = {
-          ...currentState,
-          messages: [
-            ...currentState.messages,
-            `Previous query failed with error: ${error instanceof Error ? error.message : String(error)}`,
-            `Current query was: ${currentState.currentQuery}`,
-            "Please fix the query and try again",
-          ],
-          validationErrors: [],
-        };
-        attempt++;
-        continue;
-      }
-      throw error;
-    }
-  }
-
-  throw new Error("Max retries reached without successful validation");
-}
-
 async function main() {
   try {
     const { numQueries } = parseArgs();
@@ -115,7 +44,7 @@ async function main() {
 
     // Create the query graph
     logger.info("\n=== Creating Query Graph ===");
-    const graph = await createQueryChain(llmEnv.GRAPHQL_API_URL);
+    const chain = await createQueryChain(llmEnv.GRAPHQL_API_URL);
     logger.info("Query graph created successfully");
 
     const explorationPrompt = ChatPromptTemplate.fromMessages([
@@ -146,7 +75,7 @@ async function main() {
       };
 
       // Run the query
-      const result = await runQueryWithRetry(graph, initialState, 3);
+      const result = await runQueryWithRetry(chain, initialState, 3);
 
       // Format the response using the existing formatter
       const responsePrompt = ChatPromptTemplate.fromMessages([

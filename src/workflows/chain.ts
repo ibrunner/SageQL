@@ -4,7 +4,7 @@ import { createGraphQLExecutorTool } from "../tools/graphqlExecutor.js";
 import { queryValidatorTool } from "../tools/queryValidator.js";
 import { logger } from "../lib/logger.js";
 import { BaseMessage } from "@langchain/core/messages";
-import { getMessageString } from "../agents/runQueryWithRetry.js";
+import { getMessageString } from "../lib/getMessageString.js";
 
 export interface ChainState {
   messages: (string | BaseMessage)[];
@@ -21,8 +21,8 @@ export async function createQueryChain(
   const executor = createGraphQLExecutorTool(apiUrl);
   const validator = queryValidatorTool;
 
-  // Create the graph
-  const graph = RunnableSequence.from([
+  // Create the chain
+  const chain = RunnableSequence.from([
     // Query builder step
     async (state: ChainState) => {
       logger.debug("\n=== Query Builder Step ===");
@@ -68,5 +68,5 @@ export async function createQueryChain(
     },
   ]);
 
-  return graph;
+  return chain;
 }

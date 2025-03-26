@@ -2,8 +2,111 @@ import { ChainState } from "../workflows/chain.js";
 import { formatValidationErrors } from "../lib/graphql/errorFormatting.js";
 import { VALIDATION_RETRY_PROMPT } from "./prompts/retryValidation.js";
 import { EXECUTION_RETRY_PROMPT } from "./prompts/retryExecution.js";
-import { BaseMessage, MessageContent } from "@langchain/core/messages";
 import { logger } from "../lib/logger.js";
+import { getMessageString } from "../lib/getMessageString.js";
+
+/**
+ * Executes a GraphQL query with automatic retry logic for validation errors
+ * @param {any} chain - The LangGraph instance for query execution
+ * @param {ChainState} initialState - Initial state containing query and schema information
+ * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
+ * @returns {Promise<ChainState>} Final state after query execution
+ * @throws {Error} When max retries are reached without successful validation
+ */
+export async function runQueryWithRetry(
+  chain: any,
+  initialState: ChainState,
+  maxRetries: number = 3,
+): Promise<ChainState> {
+  let currentState = initialState;
+  let attempt = 1;
+
+  while (attempt <= maxRetries) {
+    logger.debug(`\n=== Attempt ${attempt}/${maxRetries} ===`);
+    if (attempt > 1) {
+      logger.debug("Previous query:", currentState.currentQuery);
+      logger.debug("Previous errors:", currentState.validationErrors);
+      logger.debug("Current messages:", currentState.messages);
+    }
+
+    try {
+      const result = await chain.invoke(currentState);
+
+      if (result.validationErrors?.length) {
+        logger.error("\nValidation Errors:");
+        result.validationErrors.forEach((error: string) =>
+          logger.error(`- ${error}`),
+        );
+
+        if (attempt < maxRetries) {
+          logger.info("\nRetrying with updated context...");
+
+          // Add structured validation error handling
+          const { validationContext } = formatValidationErrors(
+            result.validationErrors,
+          );
+          const formattedPrompt = await VALIDATION_RETRY_PROMPT.format({
+            validationContext,
+            failedQuery: result.currentQuery,
+            schemaContext: JSON.stringify(currentState.schema, null, 2),
+          });
+
+          logger.debug("\nRetry context being sent to model:");
+          logger.debug(getMessageString(formattedPrompt));
+
+          currentState = {
+            ...currentState,
+            messages: [
+              ...currentState.messages,
+              getMessageString(formattedPrompt.content),
+            ],
+            validationErrors: [],
+          };
+          attempt++;
+          continue;
+        }
+      }
+
+      return result;
+    } catch (error) {
+      logger.error("\nExecution Error:");
+      if (error instanceof Error) {
+        logger.error(`- ${error.message}`);
+      } else {
+        logger.error(`- ${error}`);
+      }
+
+      if (attempt < maxRetries) {
+        logger.info("\nRetrying with updated context...");
+
+        // Add structured execution error handling
+        const formattedPrompt = await EXECUTION_RETRY_PROMPT.format({
+          errorMessage: error instanceof Error ? error.message : String(error),
+          failedQuery: currentState.currentQuery,
+          schemaContext: JSON.stringify(currentState.schema, null, 2),
+        });
+
+        logger.debug("\nRetry context being sent to model:");
+        logger.debug(getMessageString(formattedPrompt));
+
+        currentState = {
+          ...currentState,
+          messages: [
+            ...currentState.messages,
+            getMessageString(formattedPrompt.content),
+          ],
+          validationErrors: [],
+        };
+        attempt++;
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error("Max retries reached without successful validation");
+}
+
 /**
  * Executes a GraphQL query with automatic retry logic for validation errors
  * @param {any} graph - The LangGraph instance for query execution
@@ -12,7 +115,7 @@ import { logger } from "../lib/logger.js";
  * @returns {Promise<ChainState>} Final state after query execution
  * @throws {Error} When max retries are reached without successful validation
  */
-export async function runQueryWithRetry(
+export async function runQueryWithRetryOld(
   graph: any,
   initialState: ChainState,
   maxRetries: number = 3,
@@ -120,24 +223,4 @@ async function handleExecutionError(
     messages: [originalQuery, getMessageString(formattedPrompt.content)],
     validationErrors: [],
   };
-}
-
-/**
- * Converts MessageContent or BaseMessage to string representation
- */
-export function getMessageString(
-  content: MessageContent | BaseMessage,
-): string {
-  if (content instanceof BaseMessage) {
-    return getMessageString(content.content);
-  }
-  if (typeof content === "string") {
-    return content;
-  }
-  if (Array.isArray(content)) {
-    return content
-      .map((item) => (typeof item === "string" ? item : JSON.stringify(item)))
-      .join(" ");
-  }
-  return JSON.stringify(content);
 }
