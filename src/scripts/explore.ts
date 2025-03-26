@@ -1,6 +1,6 @@
 import { config } from "dotenv";
-import { createQueryChain } from "../agents/chain.js";
-import { ChainState } from "../agents/chain.js";
+import { createQueryChain } from "../workflows/chain.js";
+import { ChainState } from "../workflows/chain.js";
 import { loadLatestSchema } from "../lib/schema.js";
 import {
   ChatPromptTemplate,
@@ -8,8 +8,8 @@ import {
 } from "@langchain/core/prompts";
 import { HumanMessage } from "@langchain/core/messages";
 import { llmModel, llmEnv } from "../lib/llmClient.js";
-import { RESPONSE_FORMATTER_PROMPT } from "../prompts/agent/responseFormatter.js";
-import { EXPLORE_PROMPT } from "../prompts/developer/explore.js";
+import { RESPONSE_FORMATTER_PROMPT } from "../agents/prompts/responseFormatter.js";
+import { EXPLORE_PROMPT } from "./prompts/explore.js";
 config();
 
 function parseArgs() {

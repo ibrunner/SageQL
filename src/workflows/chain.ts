@@ -1,5 +1,5 @@
 import { RunnableSequence } from "@langchain/core/runnables";
-import { generateQuery } from "./queryBuilder.js";
+import { generateQuery } from "../agents/queryBuilder.js";
 import { createGraphQLExecutorTool } from "../tools/graphqlExecutor.js";
 import { queryValidatorTool } from "../tools/queryValidator.js";
 

@@ -1,8 +1,8 @@
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
-import { schemaUnderstandingPrompts } from "../../prompts/developer/schemaUnderstanding.js";
-import { queryGenerationPrompts } from "../../prompts/developer/queryGeneration.js";
-import { QUERY_BUILDER_PROMPT } from "../../prompts/agent/queryBuilder.js";
+import { schemaUnderstandingPrompts } from "../prompts/schemaUnderstanding.js";
+import { queryGenerationPrompts } from "../prompts/queryGeneration.js";
+import { QUERY_BUILDER_PROMPT } from "../../agents/prompts/queryBuilder.js";
 import { llmModel, llmEnv } from "../../lib/llmClient.js";
 // System prompt for the AI
 

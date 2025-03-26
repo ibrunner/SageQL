@@ -6,7 +6,7 @@ import {
 import { BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { GraphQLSchema, parse, validate, buildClientSchema } from "graphql";
 import { llmModel } from "../lib/llmClient.js";
-import { QUERY_BUILDER_PROMPT_TEMPLATE } from "../prompts/agent/queryBuilder.js";
+import { QUERY_BUILDER_PROMPT_TEMPLATE } from "./prompts/queryBuilder.js";
 
 export interface QueryBuilderState {
   messages: BaseMessage[];
@@ -68,7 +68,7 @@ const validateGraphQLQuery = (
   }
 };
 
-const createQueryBuilderPrompt = () => {
+export const createQueryBuilderPrompt = () => {
   return ChatPromptTemplate.fromMessages([
     ["system", QUERY_BUILDER_PROMPT_TEMPLATE],
     new MessagesPlaceholder("messages"),
