@@ -15,28 +15,48 @@ Please generate a new query that:
 4. Uses ONLY the arguments defined in the schema
 5. Follows proper GraphQL syntax
 6. Keeps the same field selection structure
-{additionalInstructions}
+{#if hasFieldSuggestions}
+7. Uses the suggested field names where applicable
+8. Replaces any incorrect field names with their correct versions from the schema
+{/if}
+{#if hasFilterErrors}
+{#if hasFieldSuggestions}9{else}7{/if}. Uses the correct filter codes and structures
+{#if hasFieldSuggestions}10{else}8{/if}. Follows the filter guidelines for continents, countries, and languages
+{/if}
 
 Schema context:
 {schemaContext}`);
 
-export const FIELD_NAME_ERROR_TEMPLATE = `Field Name Errors:
+export const ERROR_TEMPLATES = {
+  fieldName: `{#if fieldErrors}
+Field Name Errors:
 {fieldErrors}
+{#if fieldSuggestions}
+Suggested field names to use:
 {fieldSuggestions}
-Please use ONLY the exact field names from the schema. Do not guess or abbreviate field names.`;
+{/if}
+Please use ONLY the exact field names from the schema. Do not guess or abbreviate field names.
+{/if}`,
 
-export const ARGUMENT_ERROR_TEMPLATE = `Argument Errors:
+  argument: `{#if argumentErrors}
+Argument Errors:
 {argumentErrors}
-Please use ONLY the arguments defined in the schema.`;
+Please use ONLY the arguments defined in the schema.
+{/if}`,
 
-export const TYPE_ERROR_TEMPLATE = `Type Errors:
+  type: `{#if typeErrors}
+Type Errors:
 {typeErrors}
-Please ensure all field types match the schema exactly.`;
+Please ensure all field types match the schema exactly.
+{/if}`,
 
-export const FILTER_ERROR_TEMPLATE = `Filter Errors:
+  filter: `{#if filterErrors}
+Filter Errors:
 {filterErrors}
 Please ensure filters follow these guidelines:
 1. Use standard two-letter codes for continents (e.g., "EU" for Europe)
 2. Use ISO codes for countries and languages
 3. Follow the exact filter structure from the schema
-4. Check the schema for the correct filter input type`;
+4. Check the schema for the correct filter input type
+{/if}`,
+};

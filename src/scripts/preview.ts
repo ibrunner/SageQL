@@ -4,7 +4,7 @@ import {
   parseChatOptions,
   handlePromptSelection,
   logChatOutput,
-} from "./chat/chat.js";
+} from "./chat.js";
 import { loadLatestSchema } from "../lib/schema.js";
 
 /**

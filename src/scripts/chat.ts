@@ -1,13 +1,61 @@
+import { config } from "dotenv";
+import { loadLatestSchema } from "../lib/schema.js";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
-import { schemaUnderstandingPrompts } from "../prompts/schemaUnderstanding.js";
-import { queryGenerationPrompts } from "../prompts/queryGeneration.js";
-import { QUERY_BUILDER_PROMPT } from "../../agents/prompts/queryBuilder.js";
-import { llmModel, llmEnv } from "../../lib/llmClient.js";
-// System prompt for the AI
+import { schemaUnderstandingPrompts } from "./prompts/schemaUnderstanding.js";
+import { queryGenerationPrompts } from "./prompts/queryGeneration.js";
+import { QUERY_BUILDER_PROMPT } from "../agents/prompts/queryBuilder.js";
+import { llmModel, llmEnv } from "../lib/llmClient.js";
+
+// Load environment variables
+config();
+
+async function chat(prompt: string, verbose = false) {
+  try {
+    // Load the introspection schema
+    const schema = await loadLatestSchema();
+    const messages = await generateChatMessages(prompt, schema);
+
+    if (verbose) {
+      console.log("Messages being sent to LLM:", messages);
+    }
+
+    // Get completion using the generic chat client
+    const completion = await chatWithClient(messages);
+
+    const response =
+      completion.choices[0]?.message?.content?.toString() || undefined;
+    console.log("\nAI Response:", response);
+    return response;
+  } catch (error) {
+    console.error("Error in chat:", error);
+    throw error;
+  }
+}
+
+// Main function to run the chat
+async function main() {
+  const options = parseChatOptions();
+  const selectedPrompt = handlePromptSelection(options);
+
+  if (!selectedPrompt) {
+    return;
+  }
+
+  const schema = await loadLatestSchema();
+  const messages = await generateChatMessages(selectedPrompt.prompt, schema);
+  const response = await chat(selectedPrompt.prompt, options.verbose);
+
+  if (options.logOutput) {
+    logChatOutput("chat", messages, response);
+  }
+}
+
+// Run the script
+main().catch(console.error);
 
 // Combine all sample prompts
-export const ALL_SAMPLE_PROMPTS = [
+const ALL_SAMPLE_PROMPTS = [
   ...schemaUnderstandingPrompts,
   ...queryGenerationPrompts,
 ];
@@ -80,7 +128,7 @@ export function handlePromptSelection(
   return selectedPrompt;
 }
 
-export function getRandomPrompt(): Prompt {
+function getRandomPrompt(): Prompt {
   const randomIndex = Math.floor(Math.random() * ALL_SAMPLE_PROMPTS.length);
   const prompt = ALL_SAMPLE_PROMPTS[randomIndex];
   return {
@@ -90,7 +138,7 @@ export function getRandomPrompt(): Prompt {
   };
 }
 
-export function getPromptByName(name: string): Prompt | undefined {
+function getPromptByName(name: string): Prompt | undefined {
   return ALL_SAMPLE_PROMPTS.find((p) => p.name === name);
 }
 
@@ -121,7 +169,7 @@ export async function generateChatMessages(
  * Ensures the specified output directory exists
  * @param {string} dir - Directory path to check/create
  */
-export function ensureOutputDir(dir: string) {
+function ensureOutputDir(dir: string) {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
@@ -163,7 +211,7 @@ export function logChatOutput(
  * @param {ChatMessage[]} messages - Array of chat messages
  * @returns {Promise<any>} Chat completion response
  */
-export async function chatWithClient(messages: ChatMessage[]) {
+async function chatWithClient(messages: ChatMessage[]) {
   try {
     const langChainMessages = messages.map((msg) => ({
       ...msg,

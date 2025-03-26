@@ -79,13 +79,11 @@ async function handleValidationError(
   validationErrors: string[],
   verbose: boolean = false,
 ): Promise<ChainState> {
-  const { validationContext, additionalInstructions } =
-    formatValidationErrors(validationErrors);
+  const { validationContext } = formatValidationErrors(validationErrors);
 
   const formattedPrompt = await VALIDATION_RETRY_PROMPT.format({
     validationContext,
     failedQuery: currentState.currentQuery,
-    additionalInstructions,
     schemaContext: JSON.stringify(currentState.schema, null, 2),
   });
 
