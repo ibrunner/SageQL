@@ -15,7 +15,17 @@ export interface QueryBuilderState {
   validationErrors?: string[];
 }
 
-function extractGraphQLQuery(response: string): string {
+export interface QueryBuilderConfig {
+  model?: ChatOpenAI;
+  verbose?: boolean;
+}
+
+export interface QueryResult {
+  query: string;
+  errors?: string[];
+}
+
+const extractGraphQLQuery = (response: string): string => {
   // First try to find a code block with graphql language specifier
   const graphqlBlock = response.match(/```graphql\n([\s\S]*?)```/);
   if (graphqlBlock) {
@@ -30,12 +40,12 @@ function extractGraphQLQuery(response: string): string {
 
   // If no code blocks found, return the entire response trimmed
   return response.trim();
-}
+};
 
-function validateGraphQLQuery(
+const validateGraphQLQuery = (
   query: string,
   schema: GraphQLSchema,
-): { isValid: boolean; errors?: string[] } {
+): { isValid: boolean; errors?: string[] } => {
   try {
     const ast = parse(query);
     const validationErrors = validate(schema, ast);
@@ -56,67 +66,66 @@ function validateGraphQLQuery(
       ],
     };
   }
-}
+};
 
-export class QueryBuilderAgent {
-  private model: ChatOpenAI;
-  private prompt: ChatPromptTemplate;
-  private verbose: boolean;
+const createQueryBuilderPrompt = () => {
+  return ChatPromptTemplate.fromMessages([
+    ["system", QUERY_BUILDER_PROMPT_TEMPLATE],
+    new MessagesPlaceholder("messages"),
+  ]);
+};
 
-  constructor(verbose: boolean = false) {
-    this.model = llmModel;
-    this.verbose = verbose;
-
-    this.prompt = ChatPromptTemplate.fromMessages([
-      ["system", QUERY_BUILDER_PROMPT_TEMPLATE],
-      new MessagesPlaceholder("messages"),
-    ]);
-  }
-
-  async generateQuery(
-    request: string,
-    schema: string,
-  ): Promise<{ query: string; errors?: string[] }> {
-    if (this.verbose) console.log("\n=== Generating Query ===");
-    if (this.verbose) console.log("Request:", request);
-    if (this.verbose) console.log("Schema:", schema);
-
-    const state: QueryBuilderState = {
-      messages: [],
-      schema,
-    };
-
-    if (this.verbose) console.log("\n=== Invoking Model ===");
-    const formattedPrompt = await this.prompt.format({
-      schema,
-      messages: [new HumanMessage(request)],
-    });
-    if (this.verbose) console.log("Formatted prompt:", formattedPrompt);
-
-    const response = await this.model.invoke(formattedPrompt);
-    if (this.verbose) console.log("Model execution completed");
-    if (this.verbose) console.log("Raw response:", response);
-
-    // Extract the query from the response
-    const extractedQuery = extractGraphQLQuery(
-      typeof response.content === "string"
-        ? response.content
-        : JSON.stringify(response.content),
-    );
-    if (this.verbose) console.log("Extracted query:", extractedQuery);
-
-    // Parse the schema for validation
-    const parsedSchema = buildClientSchema(JSON.parse(schema));
-
-    // Validate the extracted query
-    const validation = validateGraphQLQuery(extractedQuery, parsedSchema);
-    if (this.verbose) {
-      console.log("Validation result:", validation);
+const logDebug = (verbose: boolean, message: string, data?: any) => {
+  if (verbose) {
+    console.log(message);
+    if (data !== undefined) {
+      console.log(data);
     }
-
-    return {
-      query: extractedQuery,
-      errors: validation.errors,
-    };
   }
-}
+};
+
+export const generateQuery = async (
+  request: string,
+  schema: string,
+  config: QueryBuilderConfig = {},
+): Promise<QueryResult> => {
+  const { model = llmModel, verbose = false } = config;
+  const prompt = createQueryBuilderPrompt();
+
+  logDebug(verbose, "\n=== Generating Query ===");
+  logDebug(verbose, "Request:", request);
+  logDebug(verbose, "Schema:", schema);
+
+  // Format the prompt
+  logDebug(verbose, "\n=== Invoking Model ===");
+  const formattedPrompt = await prompt.format({
+    schema,
+    messages: [new HumanMessage(request)],
+  });
+  logDebug(verbose, "Formatted prompt:", formattedPrompt);
+
+  // Get response from model
+  const response = await model.invoke(formattedPrompt);
+  logDebug(verbose, "Model execution completed");
+  logDebug(verbose, "Raw response:", response);
+
+  // Extract the query from the response
+  const extractedQuery = extractGraphQLQuery(
+    typeof response.content === "string"
+      ? response.content
+      : JSON.stringify(response.content),
+  );
+  logDebug(verbose, "Extracted query:", extractedQuery);
+
+  // Parse the schema for validation
+  const parsedSchema = buildClientSchema(JSON.parse(schema));
+
+  // Validate the extracted query
+  const validation = validateGraphQLQuery(extractedQuery, parsedSchema);
+  logDebug(verbose, "Validation result:", validation);
+
+  return {
+    query: extractedQuery,
+    errors: validation.errors,
+  };
+};

@@ -1,7 +1,7 @@
 import { RunnableSequence } from "@langchain/core/runnables";
-import { QueryBuilderAgent } from "./queryBuilder.js";
-import { GraphQLExecutorTool } from "../tools/graphqlExecutor.js";
-import { QueryValidatorTool } from "../tools/queryValidator.js";
+import { generateQuery } from "./queryBuilder.js";
+import { createGraphQLExecutorTool } from "../tools/graphqlExecutor.js";
+import { queryValidatorTool } from "../tools/queryValidator.js";
 
 export interface ChainState {
   messages: string[];
@@ -16,23 +16,23 @@ export async function createQueryChain(
   verbose: boolean = false,
 ): Promise<RunnableSequence> {
   // Create tools
-  const queryBuilder = new QueryBuilderAgent(verbose);
-  const validator = new QueryValidatorTool();
-  const executor = new GraphQLExecutorTool(apiUrl);
+  const executor = createGraphQLExecutorTool(apiUrl);
+  const validator = queryValidatorTool;
 
   // Create the graph
   const graph = RunnableSequence.from([
     // Query builder step
     async (state: ChainState) => {
       if (verbose) console.log("\n=== Query Builder Step ===");
-      const result = await queryBuilder.generateQuery(
+      const result = await generateQuery(
         state.messages[state.messages.length - 1],
         state.schema,
+        { verbose },
       );
       return {
         ...state,
         currentQuery: result.query,
-        validationErrors: result.errors,
+        validationErrors: result.errors || [],
       };
     },
     // Validator step

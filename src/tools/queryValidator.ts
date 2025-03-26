@@ -1,18 +1,14 @@
-import { StructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
+import { tool } from "@langchain/core/tools";
 import { parse, validate, buildClientSchema } from "graphql";
 
-const QueryValidatorSchema = z.object({
+const queryValidatorSchema = z.object({
   query: z.string().describe("The GraphQL query to validate"),
   schema: z.string().describe("The GraphQL schema JSON to validate against"),
 });
 
-export class QueryValidatorTool extends StructuredTool {
-  name = "query_validator";
-  description = "Validates a GraphQL query against the schema";
-  schema = QueryValidatorSchema;
-
-  async _call(input: z.infer<typeof QueryValidatorSchema>) {
+export const queryValidatorTool = tool(
+  async (input): Promise<string> => {
     try {
       const ast = parse(input.query);
       const parsedSchema = buildClientSchema(JSON.parse(input.schema));
@@ -41,5 +37,10 @@ export class QueryValidatorTool extends StructuredTool {
         errors: ["An unknown error occurred while validating the query"],
       });
     }
-  }
-}
+  },
+  {
+    name: "query_validator",
+    description: "Validates a GraphQL query against the schema",
+    schema: queryValidatorSchema,
+  },
+);
