@@ -1,4 +1,4 @@
-import { ChainState } from "./chain.js";
+import { QueryChainState } from "./queryChain.js";
 import { formatValidationErrors } from "../lib/graphql/errorFormatting.js";
 import { VALIDATION_RETRY_PROMPT } from "../agents/prompts/retryValidation.js";
 import { EXECUTION_RETRY_PROMPT } from "../agents/prompts/retryExecution.js";
@@ -8,16 +8,16 @@ import { getMessageString } from "../lib/getMessageString.js";
 /**
  * Executes a the langchain chain with automatic retry logic for validation errors
  * @param {any} chain - The LangGraph instance for query execution
- * @param {ChainState} initialState - Initial state containing query and schema information
+ * @param {QueryChainState} initialState - Initial state containing query and schema information
  * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
- * @returns {Promise<ChainState>} Final state after query execution
+ * @returns {Promise<QueryChainState>} Final state after query execution
  * @throws {Error} When max retries are reached without successful validation
  */
 export async function runQueryChainWithRetry(
   chain: any,
-  initialState: ChainState,
+  initialState: QueryChainState,
   maxRetries: number = 3,
-): Promise<ChainState> {
+): Promise<QueryChainState> {
   let currentState = initialState;
   let attempt = 1;
 
@@ -110,16 +110,16 @@ export async function runQueryChainWithRetry(
 /**
  * Executes a GraphQL query with automatic retry logic for validation errors
  * @param {any} graph - The LangGraph instance for query execution
- * @param {ChainState} initialState - Initial state containing query and schema information
+ * @param {QueryChainState} initialState - Initial state containing query and schema information
  * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
- * @returns {Promise<ChainState>} Final state after query execution
+ * @returns {Promise<QueryChainState>} Final state after query execution
  * @throws {Error} When max retries are reached without successful validation
  */
 export async function runQueryChainWithRetryOld(
   graph: any,
-  initialState: ChainState,
+  initialState: QueryChainState,
   maxRetries: number = 3,
-): Promise<ChainState> {
+): Promise<QueryChainState> {
   let currentState = initialState;
   let attempt = 1;
 
@@ -173,9 +173,9 @@ export async function runQueryChainWithRetryOld(
  * Handles validation errors and prepares state for retry
  */
 async function handleValidationError(
-  currentState: ChainState,
+  currentState: QueryChainState,
   validationErrors: string[],
-): Promise<ChainState> {
+): Promise<QueryChainState> {
   const { validationContext } = formatValidationErrors(validationErrors);
 
   const formattedPrompt = await VALIDATION_RETRY_PROMPT.format({
@@ -201,9 +201,9 @@ async function handleValidationError(
  * Handles execution errors and prepares state for retry
  */
 async function handleExecutionError(
-  currentState: ChainState,
+  currentState: QueryChainState,
   error: unknown,
-): Promise<ChainState> {
+): Promise<QueryChainState> {
   const errorMessage = error instanceof Error ? error.message : String(error);
 
   const formattedPrompt = await EXECUTION_RETRY_PROMPT.format({

@@ -6,7 +6,7 @@ import { logger } from "../lib/logger.js";
 import { BaseMessage } from "@langchain/core/messages";
 import { getMessageString } from "../lib/getMessageString.js";
 
-export interface ChainState {
+export interface QueryChainState {
   messages: (string | BaseMessage)[];
   schema: string;
   currentQuery: string;
@@ -24,7 +24,7 @@ export async function createQueryChain(
   // Create the chain
   const chain = RunnableSequence.from([
     // Query builder step
-    async (state: ChainState) => {
+    async (state: QueryChainState) => {
       logger.debug("\n=== Query Builder Step ===");
       const result = await generateQuery(
         getMessageString(state.messages[state.messages.length - 1]),
@@ -38,7 +38,7 @@ export async function createQueryChain(
       };
     },
     // Validator step
-    async (state: ChainState) => {
+    async (state: QueryChainState) => {
       logger.debug("\n=== Query Validator Step ===");
       const result = await validator.call({
         query: state.currentQuery,
@@ -52,7 +52,7 @@ export async function createQueryChain(
       };
     },
     // Executor step
-    async (state: ChainState) => {
+    async (state: QueryChainState) => {
       logger.debug("\n=== Query Executor Step ===");
       if (state.validationErrors?.length > 0) {
         return state;

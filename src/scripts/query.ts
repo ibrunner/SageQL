@@ -1,6 +1,6 @@
 import { config } from "dotenv";
-import { createQueryChain } from "../workflows/chain.js";
-import { ChainState } from "../workflows/chain.js";
+import { createQueryChain } from "../workflows/queryChain.js";
+import { QueryChainState } from "../workflows/queryChain.js";
 import { loadLatestSchema } from "../lib/schema.js";
 import { runQueryChainWithRetry } from "../workflows/runQueryChainWithRetry.js";
 import { getMessageString } from "../lib/getMessageString.js";
@@ -43,7 +43,7 @@ async function main() {
 
     // Initialize the graph state
     logger.debug("\n=== Initializing Graph State ===");
-    const initialState: ChainState = {
+    const initialState: QueryChainState = {
       messages: [query],
       schema: schemaJson,
       currentQuery: "",

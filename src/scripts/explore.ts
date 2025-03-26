@@ -1,6 +1,6 @@
 import { config } from "dotenv";
-import { createQueryChain } from "../workflows/chain.js";
-import { ChainState } from "../workflows/chain.js";
+import { createQueryChain } from "../workflows/queryChain.js";
+import { ChainState } from "../workflows/queryChain.js";
 import { loadLatestSchema } from "../lib/schema.js";
 import {
   ChatPromptTemplate,
