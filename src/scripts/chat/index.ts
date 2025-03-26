@@ -7,8 +7,8 @@ import {
   logChatOutput,
   createChatClient,
   chatWithClient,
-} from "../lib/chat.js";
-import { loadLatestSchema } from "../lib/schema.js";
+} from "./chat.js";
+import { loadLatestSchema } from "../../lib/schema.js";
 
 // Load environment variables
 config();

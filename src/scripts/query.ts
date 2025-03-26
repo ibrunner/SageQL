@@ -2,27 +2,104 @@ import { config } from "dotenv";
 import { createQueryChain } from "../agents/chain.js";
 import { ChainState } from "../agents/chain.js";
 import { loadLatestSchema } from "../lib/schema.js";
-import { ChatOpenAI } from "@langchain/openai";
+
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
 } from "@langchain/core/prompts";
 import { HumanMessage } from "@langchain/core/messages";
-import { z } from "zod";
+import { llmEnv, llmModel } from "../lib/llmClient.js";
 import { RESPONSE_FORMATTER_PROMPT } from "../prompts/agent/response-formatter.js";
 
 config();
 
-// Environment schema
-const envSchema = z.object({
-  OPENAI_API_KEY: z.string().min(1, "OpenAI API key is required"),
-  OPENAI_API_BASE: z.string().url("OpenAI API base URL is required"),
-  OPENAI_MODEL: z.string().optional(),
-  GRAPHQL_API_URL: z.string().url("GraphQL API URL is required"),
-});
+/**
+ * Main entry point for the query execution script
+ * Handles the complete workflow of:
+ * - Loading GraphQL schema
+ * - Creating and executing query graph
+ * - Processing results
+ * - Generating natural language response
+ * @throws {Error} If any step in the process fails
+ */
+async function main() {
+  try {
+    const { query, verbose } = parseArgs();
 
-// Validate environment variables
-const env = envSchema.parse(process.env);
+    if (verbose) {
+      console.log("\n=== Starting Query Process ===");
+      console.log("Input query:", query);
+    }
+
+    // Load the schema
+    if (verbose) console.log("\n=== Loading Schema ===");
+    const schemaJson = loadLatestSchema();
+    if (verbose) console.log("Schema JSON loaded successfully");
+
+    // Create the query graph
+    if (verbose) console.log("\n=== Creating Query Graph ===");
+    const graph = await createQueryChain(llmEnv.GRAPHQL_API_URL, verbose);
+    if (verbose) console.log("Query graph created successfully");
+
+    // Initialize the graph state
+    if (verbose) console.log("\n=== Initializing Graph State ===");
+    const initialState: ChainState = {
+      messages: [query],
+      schema: schemaJson,
+      currentQuery: "",
+      validationErrors: [],
+      executionResult: null,
+    };
+    if (verbose)
+      console.log("Initial state:", JSON.stringify(initialState, null, 2));
+
+    // Run the graph
+    if (verbose) console.log("\n=== Running Query Graph ===");
+    const result = await runQueryWithRetry(graph, initialState, 3, verbose);
+    if (verbose) console.log("Graph execution completed");
+
+    // Generate natural language response
+    if (verbose) console.log("\n=== Generating Natural Language Response ===");
+
+    const prompt = ChatPromptTemplate.fromMessages([
+      ["system", RESPONSE_FORMATTER_PROMPT],
+      new MessagesPlaceholder("messages"),
+    ]);
+
+    const response = await llmModel.invoke(
+      await prompt.format({
+        queryResults: JSON.stringify(result.executionResult, null, 2),
+        question: query,
+        messages: [new HumanMessage(query)],
+      }),
+    );
+
+    // Output the results
+    console.log("\n=== Results ===");
+    console.log("\nGenerated Query:");
+    console.log(result.currentQuery);
+
+    if (result.validationErrors?.length) {
+      console.log("\nValidation Errors:");
+      result.validationErrors.forEach((error) => console.log(`- ${error}`));
+    }
+
+    console.log("\nResponse:");
+    console.log(response.content);
+  } catch (error: unknown) {
+    console.error("\n=== Error Occurred ===");
+    if (error instanceof Error) {
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+    } else {
+      console.error("Unknown error:", error);
+    }
+    process.exit(1);
+  }
+}
+
+main();
 
 /**
  * Parses command line arguments for the query script
@@ -248,99 +325,3 @@ async function runQueryWithRetry(
 
   throw new Error("Max retries reached without successful validation");
 }
-
-/**
- * Main entry point for the query execution script
- * Handles the complete workflow of:
- * - Loading GraphQL schema
- * - Creating and executing query graph
- * - Processing results
- * - Generating natural language response
- * @throws {Error} If any step in the process fails
- */
-async function main() {
-  try {
-    const { query, verbose } = parseArgs();
-
-    if (verbose) {
-      console.log("\n=== Starting Query Process ===");
-      console.log("Input query:", query);
-    }
-
-    // Load the schema
-    if (verbose) console.log("\n=== Loading Schema ===");
-    const schemaJson = loadLatestSchema();
-    if (verbose) console.log("Schema JSON loaded successfully");
-
-    // Create the query graph
-    if (verbose) console.log("\n=== Creating Query Graph ===");
-    const graph = await createQueryChain(env.GRAPHQL_API_URL, verbose);
-    if (verbose) console.log("Query graph created successfully");
-
-    // Initialize the graph state
-    if (verbose) console.log("\n=== Initializing Graph State ===");
-    const initialState: ChainState = {
-      messages: [query],
-      schema: schemaJson,
-      currentQuery: "",
-      validationErrors: [],
-      executionResult: null,
-    };
-    if (verbose)
-      console.log("Initial state:", JSON.stringify(initialState, null, 2));
-
-    // Run the graph
-    if (verbose) console.log("\n=== Running Query Graph ===");
-    const result = await runQueryWithRetry(graph, initialState, 3, verbose);
-    if (verbose) console.log("Graph execution completed");
-
-    // Generate natural language response
-    if (verbose) console.log("\n=== Generating Natural Language Response ===");
-    const model = new ChatOpenAI({
-      modelName: env.OPENAI_MODEL || "gpt-4-turbo-preview",
-      temperature: 0.7,
-      openAIApiKey: env.OPENAI_API_KEY,
-      configuration: {
-        baseURL: env.OPENAI_API_BASE,
-      },
-    });
-
-    const prompt = ChatPromptTemplate.fromMessages([
-      ["system", RESPONSE_FORMATTER_PROMPT],
-      new MessagesPlaceholder("messages"),
-    ]);
-
-    const response = await model.invoke(
-      await prompt.format({
-        queryResults: JSON.stringify(result.executionResult, null, 2),
-        question: query,
-        messages: [new HumanMessage(query)],
-      }),
-    );
-
-    // Output the results
-    console.log("\n=== Results ===");
-    console.log("\nGenerated Query:");
-    console.log(result.currentQuery);
-
-    if (result.validationErrors?.length) {
-      console.log("\nValidation Errors:");
-      result.validationErrors.forEach((error) => console.log(`- ${error}`));
-    }
-
-    console.log("\nResponse:");
-    console.log(response.content);
-  } catch (error: unknown) {
-    console.error("\n=== Error Occurred ===");
-    if (error instanceof Error) {
-      console.error("Error name:", error.name);
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-    } else {
-      console.error("Unknown error:", error);
-    }
-    process.exit(1);
-  }
-}
-
-main();

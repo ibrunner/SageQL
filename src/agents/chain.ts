@@ -16,10 +16,7 @@ export async function createQueryChain(
   verbose: boolean = false,
 ): Promise<RunnableSequence> {
   // Create tools
-  const queryBuilder = new QueryBuilderAgent(
-    process.env.OPENAI_MODEL || "gpt-4-turbo-preview",
-    verbose,
-  );
+  const queryBuilder = new QueryBuilderAgent(verbose);
   const validator = new QueryValidatorTool();
   const executor = new GraphQLExecutorTool(apiUrl);
 

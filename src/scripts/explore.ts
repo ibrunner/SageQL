@@ -2,27 +2,15 @@ import { config } from "dotenv";
 import { createQueryChain } from "../agents/chain.js";
 import { ChainState } from "../agents/chain.js";
 import { loadLatestSchema } from "../lib/schema.js";
-import { ChatOpenAI } from "@langchain/openai";
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
 } from "@langchain/core/prompts";
 import { HumanMessage } from "@langchain/core/messages";
-import { z } from "zod";
+import { llmModel, llmEnv } from "../lib/llmClient.js";
 import { RESPONSE_FORMATTER_PROMPT } from "../prompts/agent/response-formatter.js";
 import { EXPLORE_PROMPT } from "../prompts/developer/explore.js";
 config();
-
-// Environment schema
-const envSchema = z.object({
-  OPENAI_API_KEY: z.string().min(1, "OpenAI API key is required"),
-  OPENAI_API_BASE: z.string().url("OpenAI API base URL is required"),
-  OPENAI_MODEL: z.string().optional(),
-  GRAPHQL_API_URL: z.string().url("GraphQL API URL is required"),
-});
-
-// Validate environment variables
-const env = envSchema.parse(process.env);
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -130,18 +118,8 @@ async function main() {
 
     // Create the query graph
     if (verbose) console.log("\n=== Creating Query Graph ===");
-    const graph = await createQueryChain(env.GRAPHQL_API_URL, verbose);
+    const graph = await createQueryChain(llmEnv.GRAPHQL_API_URL, verbose);
     if (verbose) console.log("Query graph created successfully");
-
-    // Initialize the exploration model
-    const model = new ChatOpenAI({
-      modelName: env.OPENAI_MODEL || "gpt-4-turbo-preview",
-      temperature: 0.7,
-      openAIApiKey: env.OPENAI_API_KEY,
-      configuration: {
-        baseURL: env.OPENAI_API_BASE,
-      },
-    });
 
     const explorationPrompt = ChatPromptTemplate.fromMessages([
       ["system", EXPLORE_PROMPT],
@@ -153,7 +131,7 @@ async function main() {
       console.log(`\n=== Query ${i + 1}/${numQueries} ===`);
 
       // Generate an interesting query
-      const explorationResponse = await model.invoke(
+      const explorationResponse = await llmModel.invoke(
         await explorationPrompt.format({
           schema: schemaJson,
           messages: [],
@@ -179,7 +157,7 @@ async function main() {
         new MessagesPlaceholder("messages"),
       ]);
 
-      const formattedResponse = await model.invoke(
+      const formattedResponse = await llmModel.invoke(
         await responsePrompt.format({
           queryResults: JSON.stringify(result.executionResult, null, 2),
           question: explorationResponse.content.toString(),

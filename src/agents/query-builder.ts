@@ -5,21 +5,8 @@ import {
 } from "@langchain/core/prompts";
 import { BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { GraphQLSchema, parse, validate, buildClientSchema } from "graphql";
-import { config } from "dotenv";
-import { z } from "zod";
+import { llmModel } from "../lib/llmClient.js";
 import { QUERY_BUILDER_PROMPT_TEMPLATE } from "../prompts/agent/query-builder.js";
-// Load environment variables
-config();
-
-// Environment schema
-const envSchema = z.object({
-  OPENAI_API_KEY: z.string().min(1, "OpenAI API key is required"),
-  OPENAI_API_BASE: z.string().url("OpenAI API base URL is required"),
-  OPENAI_MODEL: z.string().optional(),
-});
-
-// Validate environment variables
-const env = envSchema.parse(process.env);
 
 export interface QueryBuilderState {
   messages: BaseMessage[];
@@ -76,18 +63,8 @@ export class QueryBuilderAgent {
   private prompt: ChatPromptTemplate;
   private verbose: boolean;
 
-  constructor(
-    modelName: string = env.OPENAI_MODEL || "gpt-4-turbo-preview",
-    verbose: boolean = false,
-  ) {
-    this.model = new ChatOpenAI({
-      modelName,
-      temperature: 0.1,
-      openAIApiKey: env.OPENAI_API_KEY,
-      configuration: {
-        baseURL: env.OPENAI_API_BASE,
-      },
-    });
+  constructor(verbose: boolean = false) {
+    this.model = llmModel;
     this.verbose = verbose;
 
     this.prompt = ChatPromptTemplate.fromMessages([

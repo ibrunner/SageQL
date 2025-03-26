@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { writeFile, symlink, unlink } from "fs/promises";
+import { writeFile } from "fs/promises";
 import { join } from "path";
 import {
   ApolloClient,
