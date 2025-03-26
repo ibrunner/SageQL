@@ -1,6 +1,6 @@
 import { StructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
-import { GraphQLSchema, parse, validate, buildClientSchema } from "graphql";
+import { parse, validate, buildClientSchema } from "graphql";
 
 const QueryValidatorSchema = z.object({
   query: z.string().describe("The GraphQL query to validate"),

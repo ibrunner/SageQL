@@ -8,7 +8,7 @@ import {
 } from "@langchain/core/prompts";
 import { HumanMessage } from "@langchain/core/messages";
 import { llmModel, llmEnv } from "../lib/llmClient.js";
-import { RESPONSE_FORMATTER_PROMPT } from "../prompts/agent/response-formatter.js";
+import { RESPONSE_FORMATTER_PROMPT } from "../prompts/agent/responseFormatter.js";
 import { EXPLORE_PROMPT } from "../prompts/developer/explore.js";
 config();
 

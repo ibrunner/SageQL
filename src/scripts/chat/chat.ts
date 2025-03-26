@@ -2,7 +2,7 @@ import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { schemaUnderstandingPrompts } from "../../prompts/developer/schema-understanding.js";
 import { queryGenerationPrompts } from "../../prompts/developer/query-generation.js";
-import { QUERY_BUILDER_PROMPT } from "../../prompts/agent/query-builder.js";
+import { QUERY_BUILDER_PROMPT } from "../../prompts/agent/queryBuilder.js";
 // System prompt for the AI
 
 // Combine all sample prompts
