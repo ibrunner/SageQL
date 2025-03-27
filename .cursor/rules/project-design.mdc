@@ -1,8 +1,13 @@
-# GraphQL AI Agent Framework
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# SageQL - GraphQL AI Agent Framework
 
 ## Project Overview
 
-The GraphQL AI Agent Framework is an open-source tool designed to streamline the creation of AI-powered interfaces for GraphQL APIs. By leveraging LLMs and the Model Context Protocol (MCP), this framework enables developers to create natural language interfaces to their GraphQL data without extensive prompt engineering or AI expertise.
+SageQL is an open-source tool designed to streamline the creation of AI-powered interfaces for GraphQL APIs. By leveraging LLMs and the Model Context Protocol (MCP), this framework enables developers to create natural language interfaces to their GraphQL data without extensive prompt engineering or AI expertise.
 
 ## Core Vision
 
@@ -42,20 +47,25 @@ To create a developer-friendly framework that transforms complex GraphQL schemas
    - Enables direct interaction with Claude and other LLMs
    - Standardizes input/output formats
 
-6. **Development Environment**
+6. **Development Environments**
    - Local server for interactive development
-   - Integration with Claude Desktop
-   - Output generation for production deployment
+     - Local MCP Integration with desktop apps/IDE
+     - Output generation for static/in-memory production deployment
+   - Container for stand-alone server, memory database
+     - configuration for internal/external storage
+     - MCP interface against production server
 
 ### Agent Architecture
 
 The framework employs a multi-agent approach, with each agent specializing in a specific aspect of GraphQL interaction:
 
-1. **Schema Agent**
+
+1. **Schema/Planning Agent**
 
    - Expert in understanding GraphQL schema structure
    - Maps natural language concepts to schema elements
    - Identifies relevant types and fields for a given intent
+   - Can break complicated requests into a series or parallel or sequential queries
 
 2. **Query Builder Agent**
 
@@ -91,62 +101,82 @@ User Request → Schema Agent → Query Builder → Validation Agent →
 
 ## Implementation Plan
 
-### Phase 1: Core Framework
+### Phase 1: Core Framework 
 
 1. **Schema Processing Module**
-
    - Introspection query handler
    - Schema transformation utilities
-   - Context optimization for LLM consumption
 
 2. **Basic Query Generation**
-
    - Single-agent implementation
-   - Direct integration with Claude API
    - Simple validation against schema
+
+3. **LangGraph Integration**
+   - Define agent nodes and responsibilities
+   - Implement state management
+   - Create basic flow control logic
+
+### Phase 2: Optimization and fine-tuning
+
+1. **Schema Optimization**
+   - Context optimization for LLM consumption
+   - Schema compression
+
+2. **Specialized Agent Development**
+   - Planning agent - breaks intents into multi-step queries
+   - Detailed Schema agent - provides additional schema to context
+   - Intents Schema agent - Vectorized schema sections by intent
+   - Basic template for user-added prompts to provide API context
 
 3. **MCP Tool Definitions**
    - Define standard interfaces for GraphQL operations
    - Implement MCP-compatible API endpoints
    - Create developer documentation
 
-### Phase 2: Multi-Agent Architecture
-
-1. **LangGraph Integration**
-
-   - Define agent nodes and responsibilities
-   - Implement state management
-   - Create flow control logic
-
-2. **Specialized Agent Development**
-
-   - Implement individual agents with focused capabilities
-   - Define communication protocols between agents
-   - Create testing framework for agent performance
-
-3. **Memory System**
+4. **In-Memory System**
+   - Simple Vectorization of schema for intents
    - Design caching mechanism for queries
    - Implement feedback loop for successful/failed queries
-   - Create persistence layer for long-term learning
+   
 
 ### Phase 3: Developer Experience
 
 1. **Local Development Environment**
-
    - Create CLI tools for setup and configuration
    - Implement local server for MCP tool hosting
-   - Build Claude Desktop integration
 
 2. **Output Generation**
-
    - Develop prompt template generation
    - Create LangGraph code output
    - Build configuration file generator
 
-3. **Documentation and Examples**
+3. **Admin UI**
+   - Onboarding - Keys, introspection, validation
+   - Human-in-the-loop fine-tuning with specialized prompt and agent
+   - Chat UI for debugging and testing
+
+4. **Documentation and Examples**
    - Create comprehensive documentation
    - Build demos with public GraphQL APIs
    - Provide sample implementations for common use cases
+
+### Phase 4: Advanced Configuration and Deployment
+
+1. **Containers and outputs**
+   - Container configuration
+   - Deployment and backup documentation
+
+2. **Persistent memory/storage**
+   - Create persistence layer for long-term learning
+   - Database / containers for persistent memory
+   - Vector and object storage
+   - Working/faulty query recall
+   
+3. **Advanced Configuration and Features**
+   - Create testing/evaluation framework for agent performance
+   - Vectorization of query intents
+   - advanced admin UI with prompt editing, storage browsing, metrics
+   - edit/replace/reset core prompts
 
 ## Technical Specifications
 
@@ -200,33 +230,7 @@ The framework will expose the following MCP-compatible tools:
    }
    ```
 
-2. **Generate Query**
-
-   ```json
-   {
-     "type": "function",
-     "function": {
-       "name": "generate_query",
-       "description": "Generates a GraphQL query from natural language",
-       "parameters": {
-         "type": "object",
-         "properties": {
-           "intent": {
-             "type": "string",
-             "description": "Natural language description of desired data"
-           },
-           "schema_context": {
-             "type": "string",
-             "description": "Relevant schema context (optional)"
-           }
-         },
-         "required": ["intent"]
-       }
-     }
-   }
-   ```
-
-3. **Validate Query**
+2. **Validate Query**
 
    ```json
    {
@@ -248,7 +252,7 @@ The framework will expose the following MCP-compatible tools:
    }
    ```
 
-4. **Execute Query**
+3. **Execute Query**
    ```json
    {
      "type": "function",

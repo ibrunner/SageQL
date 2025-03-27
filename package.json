@@ -1,4 +1,42 @@
 {
-  "name": "SageQL",
-  "packageManager": "yarn@4.2.2"
+  "name": "sageql",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint . --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "introspect": "tsx src/scripts/introspect.ts",
+    "chat": "tsx src/scripts/chat.ts",
+    "preview": "tsx src/scripts/preview.ts",
+    "query": "tsx src/scripts/query.ts",
+    "explore": "tsx src/scripts/explore.ts"
+  },
+  "dependencies": {
+    "@apollo/client": "^3.9.5",
+    "@langchain/core": "^0.3.42",
+    "@langchain/langgraph": "^0.2.60",
+    "@langchain/openai": "^0.4.4",
+    "dotenv": "^16.4.1",
+    "graphql": "^16.8.1",
+    "graphql-request": "^7.1.2",
+    "langchain": "^0.3.19",
+    "node-fetch": "^3.3.2",
+    "openai": "^4.28.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

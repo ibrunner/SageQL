@@ -3,7 +3,7 @@ You are an expert in React, Shadcn UI, GraphQL, Langchain, Langgraph, and Tailwi
 # Code Style and Structure
 
 - Write clean, maintainable JavaScript/TypeScript with clear examples
-- Use functional programming patterns; avoid classes
+- Use functional programming patterns, avoid classes
 - Implement modular architecture with clear separation of concerns
 - Use descriptive variable names (e.g., isLoading, hasError)
 - Structure files consistently: components, utilities, database queries, API routes
@@ -12,7 +12,7 @@ You are an expert in React, Shadcn UI, GraphQL, Langchain, Langgraph, and Tailwi
 
 - Organize source code under /src directory
 - Create feature-based folders for components and functionality
-- Structure the project following Vite + Netlify conventions:
+- Structure the project following Vite conventions:
   ```
   /
   ├── /src
@@ -21,12 +21,9 @@ You are an expert in React, Shadcn UI, GraphQL, Langchain, Langgraph, and Tailwi
   │   │   ├── /forms
   │   │   └── /layouts
   │   ├── /features
-  │   │   └── /(feature-specific-folders)
+  │   │   └── /(featureSpecificFolders)
   │   ├── /lib
-  │   │   ├── /utils
-  │   │   └── /supabase
-  │   ├── /routes
-  │   │   └── /(route-components)
+  │   │   └── /utils
   │   ├── /types
   │   ├── /assets
   │   ├── App.tsx
@@ -112,7 +109,7 @@ You are an expert in React, Shadcn UI, GraphQL, Langchain, Langgraph, and Tailwi
   │   ├── index.ts
   │   ├── prompts.ts
   │   └── tools.ts
-  ├── /query-builder
+  ├── /queryBuilder
   │   ├── index.ts
   │   ├── prompts.ts
   │   └── tools.ts
@@ -143,9 +140,9 @@ You are an expert in React, Shadcn UI, GraphQL, Langchain, Langgraph, and Tailwi
   ├── /cache
   │   ├── index.ts
   │   └── strategies.ts
-  ├── /entity-tracking
+  ├── /entityTracking
   │   ├── index.ts
-  │   └── reference-store.ts
+  │   └── referenceStore.ts
   └── store.ts       # Main memory system implementation
   ```
 
@@ -158,10 +155,10 @@ You are an expert in React, Shadcn UI, GraphQL, Langchain, Langgraph, and Tailwi
   ```
   /src/mcp
   ├── /tools
-  │   ├── schema-tools.ts
-  │   ├── query-tools.ts
-  │   ├── validation-tools.ts
-  │   └── execution-tools.ts
+  │   ├── schemaTools.ts
+  │   ├── queryTools.ts
+  │   ├── validationTools.ts
+  │   └── executionTools.ts
   ├── client.ts      # MCP client implementation
   └── types.ts       # MCP type definitions
   ```
@@ -177,16 +174,16 @@ You are an expert in React, Shadcn UI, GraphQL, Langchain, Langgraph, and Tailwi
   /src/graphql
   ├── /introspection
   │   ├── index.ts
-  │   └── schema-processor.ts
+  │   └── schemaProcessor.ts
   ├── /generation
   │   ├── index.ts
-  │   └── query-builder.ts
+  │   └── queryBuilder.ts
   ├── /validation
   │   ├── index.ts
-  │   └── schema-validator.ts
+  │   └── schemaValidator.ts
   ├── /execution
   │   ├── index.ts
-  │   └── api-client.ts
+  │   └── apiClient.ts
   └── types.ts       # GraphQL type definitions
   ```
 
