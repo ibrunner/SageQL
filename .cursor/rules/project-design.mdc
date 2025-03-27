@@ -122,7 +122,7 @@ User Request → Schema Agent → Query Builder → Validation Agent →
    - Context optimization for LLM consumption
    - Schema compression
 
-4. **Specialized Agent Development**
+2. **Specialized Agent Development**
    - Planning agent - breaks intents into multi-step queries
    - Detailed Schema agent - provides additional schema to context
    - Intents Schema agent - Vectorized schema sections by intent
