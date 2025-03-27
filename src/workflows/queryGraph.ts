@@ -3,14 +3,15 @@ import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
 import { generateQuery } from "../agents/queryBuilder.js";
 import { createGraphQLExecutorTool } from "../tools/graphqlExecutor.js";
-import { queryValidatorTool } from "../tools/queryValidator.js";
-import { QueryValidationOutputParser } from "../tools/queryValidator.js";
+import { queryValidatorTool } from "../lib/graphql/queryValidationOutputParser.js";
+import { QueryValidationOutputParser } from "../lib/graphql/queryValidationOutputParser.js";
 import { VALIDATION_RETRY_PROMPT } from "../agents/prompts/retryValidation.js";
 import { EXECUTION_RETRY_PROMPT } from "../agents/prompts/retryExecution.js";
 import { formatValidationErrors } from "../lib/graphql/errorFormatting.js";
 import { logger } from "../lib/logger.js";
 import { getMessageString } from "../lib/getMessageString.js";
 
+const MAX_RETRIES = 3;
 // Define state schema with reducers
 const QueryGraphStateAnnotation = Annotation.Root({
   messages: Annotation<(string | BaseMessage)[]>({
@@ -34,8 +35,6 @@ const QueryGraphStateAnnotation = Annotation.Root({
 });
 
 export type QueryGraphState = typeof QueryGraphStateAnnotation.State;
-
-const MAX_RETRIES = 3;
 
 /**
  * Creates a LangGraph for handling GraphQL query generation, validation, and execution

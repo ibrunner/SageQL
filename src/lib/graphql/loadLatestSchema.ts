@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { config } from "dotenv";
 import { z } from "zod";
-import { logger } from "./logger.js";
+import { logger } from "../logger.js";
 
 // Load environment variables
 config();

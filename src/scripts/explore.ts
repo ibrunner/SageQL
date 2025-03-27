@@ -1,7 +1,6 @@
 import { config } from "dotenv";
-import { createQueryChain } from "../workflows/queryChain.js";
-import { QueryChainState } from "../workflows/queryChain.js";
-import { loadLatestSchema } from "../lib/schema.js";
+import { createQueryGraph, QueryGraphState } from "../workflows/queryGraph.js";
+import { loadLatestSchema } from "../lib/graphql/loadLatestSchema.js";
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
@@ -12,7 +11,6 @@ import { RESPONSE_FORMATTER_PROMPT } from "../agents/prompts/responseFormatter.j
 import { EXPLORE_PROMPT } from "./prompts/explore.js";
 import { logger } from "../lib/logger.js";
 import { getMessageString } from "../lib/getMessageString.js";
-import { runQueryChainWithRetry } from "../workflows/runQueryChainWithRetry.js";
 
 config();
 
@@ -44,7 +42,7 @@ async function main() {
 
     // Create the query graph
     logger.info("\n=== Creating Query Graph ===");
-    const chain = await createQueryChain(llmEnv.GRAPHQL_API_URL);
+    const graph = await createQueryGraph(llmEnv.GRAPHQL_API_URL);
     logger.info("Query graph created successfully");
 
     const explorationPrompt = ChatPromptTemplate.fromMessages([
@@ -66,16 +64,17 @@ async function main() {
       );
 
       // Initialize the graph state
-      const initialState: QueryChainState = {
+      const initialState: QueryGraphState = {
         messages: [explorationResponse.content.toString()],
         schema: schemaJson,
         currentQuery: "",
         validationErrors: [],
         executionResult: null,
+        retryCount: 0,
       };
 
-      // Run the query
-      const result = await runQueryChainWithRetry(chain, initialState, 3);
+      // Run the query graph
+      const result = await graph.invoke(initialState);
 
       // Format the response using the existing formatter
       const responsePrompt = ChatPromptTemplate.fromMessages([

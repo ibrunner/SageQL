@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { loadLatestSchema } from "../lib/schema.js";
+import { loadLatestSchema } from "../lib/graphql/loadLatestSchema.js";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { schemaUnderstandingPrompts } from "./prompts/schemaUnderstanding.js";

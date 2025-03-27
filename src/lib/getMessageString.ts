@@ -1,7 +1,7 @@
 import { BaseMessage, MessageContent } from "@langchain/core/messages";
 
 /**
- * Converts MessageContent or BaseMessage to string representation
+ * Converts MessageContent or BaseMessage from langchain to string representation
  */
 export function getMessageString(
   content: MessageContent | BaseMessage,

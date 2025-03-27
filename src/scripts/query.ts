@@ -1,13 +1,11 @@
 import { config } from "dotenv";
-import { createQueryChain } from "../workflows/queryChain.js";
-import { QueryChainState } from "../workflows/queryChain.js";
-import { loadLatestSchema } from "../lib/schema.js";
-import { runQueryChainWithRetry } from "../workflows/runQueryChainWithRetry.js";
+import { loadLatestSchema } from "../lib/graphql/loadLatestSchema.js";
 import { getMessageString } from "../lib/getMessageString.js";
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
 } from "@langchain/core/prompts";
+import { createQueryGraph, QueryGraphState } from "../workflows/queryGraph.js";
 import { HumanMessage } from "@langchain/core/messages";
 import { llmEnv, llmModel } from "../lib/llmClient.js";
 import { RESPONSE_FORMATTER_PROMPT } from "../agents/prompts/responseFormatter.js";
@@ -38,23 +36,25 @@ async function main() {
 
     // Create the query graph
     logger.debug("\n=== Creating Query Graph ===");
-    const chain = await createQueryChain(llmEnv.GRAPHQL_API_URL);
-    logger.debug("Query chain created successfully");
+    const graph = await createQueryGraph(llmEnv.GRAPHQL_API_URL);
+    logger.debug("Query graph created successfully");
 
     // Initialize the graph state
     logger.debug("\n=== Initializing Graph State ===");
-    const initialState: QueryChainState = {
+    const initialState: QueryGraphState = {
       messages: [query],
       schema: schemaJson,
       currentQuery: "",
       validationErrors: [],
       executionResult: null,
+      retryCount: 0,
     };
+
     logger.debug("Initial state:", JSON.stringify(initialState, null, 2));
 
     // Run the graph
     logger.debug("\n=== Running Query Graph ===");
-    const result = await runQueryChainWithRetry(chain, initialState, 3);
+    const result = await graph.invoke(initialState);
     logger.debug("Graph execution completed");
 
     // Generate natural language response
