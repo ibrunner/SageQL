@@ -14,11 +14,13 @@
     "chat": "tsx src/scripts/chat.ts",
     "preview": "tsx src/scripts/preview.ts",
     "query": "tsx src/scripts/query.ts",
-    "explore": "tsx src/scripts/explore.ts"
+    "explore": "tsx src/scripts/explore.ts",
+    "exploreWithGraphs": "tsx src/scripts/exploreWithGraphs.ts"
   },
   "dependencies": {
     "@apollo/client": "^3.9.5",
     "@langchain/core": "^0.3.42",
+    "@langchain/langgraph": "^0.2.60",
     "@langchain/openai": "^0.4.4",
     "dotenv": "^16.4.1",
     "graphql": "^16.8.1",
