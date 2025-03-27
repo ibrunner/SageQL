@@ -6,7 +6,7 @@ import { logger } from "../lib/logger.js";
 import { getMessageString } from "../lib/getMessageString.js";
 
 /**
- * Executes a the langchain chain with automatic retry logic for validation errors
+ * Executes a the langchain chain with automatic retry logic for validation/execution errors
  * @param {any} chain - The LangGraph instance for query execution
  * @param {QueryChainState} initialState - Initial state containing query and schema information
  * @param {number} maxRetries - Maximum number of retry attempts (default: 3)
