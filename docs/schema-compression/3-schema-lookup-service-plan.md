@@ -7,9 +7,11 @@ This document outlines the implementation approach for the Schema Lookup Service
 ## Step 1: Schema Registry
 
 ### Purpose
+
 Create a robust storage and indexing system for both compressed and full schemas, enabling efficient element retrieval and version management.
 
 ### Implementation Approach
+
 1. Design a registry system that stores:
    - Full uncompressed schemas
    - Compressed schema variants
@@ -126,6 +128,7 @@ Create a robust storage and indexing system for both compressed and full schemas
 ```
 
 ### Validation Criteria
+
 - Efficiently stores and retrieves both full and compressed schemas
 - Maintains version history for schema changes
 - Creates effective indexes for fast element lookup
@@ -134,6 +137,7 @@ Create a robust storage and indexing system for both compressed and full schemas
 - Provides clear APIs for schema registration and retrieval
 
 ### Testing Strategy
+
 1. Test schema storage with multiple versions of the same API
 2. Verify retrieval performance for large schemas
 3. Test index effectiveness for element lookup
@@ -144,9 +148,11 @@ Create a robust storage and indexing system for both compressed and full schemas
 ## Step 2: Lookup Service
 
 ### Purpose
+
 Provide efficient access to schema elements that aren't included in the compressed schema, enabling full functionality with minimal context size.
 
 ### Implementation Approach
+
 1. Implement lookup APIs for schema elements:
    - Type lookups for missing types
    - Field lookups for pruned fields
@@ -154,6 +160,14 @@ Provide efficient access to schema elements that aren't included in the compress
 2. Create caching mechanisms for frequently accessed elements
 3. Build mapping resolution between compressed and full schema
 4. Develop context tracking for progressive schema loading
+
+The lookup service implementation will use:
+
+- Trie data structures for efficient prefix-based lookup
+- Hash-based indexes for constant-time element retrieval
+- LRU caching algorithm for frequently accessed elements
+- Bloom filters for efficient set membership testing
+- B-tree indexes for range-based queries on schema elements
 
 ### Lookup Service API Structure
 
@@ -170,7 +184,7 @@ Provide efficient access to schema elements that aren't included in the compress
       "name": "avatarUrl",                // Field name to look up
       "parentType": "User",               // Parent type name
       "includeArgs": true,                // Include argument definitions
-      "context": "user profile picture",  // Optional context for lookup 
+      "context": "user profile picture",  // Optional context for lookup
       "schemaId": "github-api-v4",
       "versionId": "v4-2023-10-15-c2"
     },
@@ -187,6 +201,7 @@ Provide efficient access to schema elements that aren't included in the compress
 ### Lookup Result Examples
 
 **Type Lookup**
+
 ```javascript
 {
   "found": true,
@@ -231,6 +246,7 @@ Provide efficient access to schema elements that aren't included in the compress
 ```
 
 **Field Lookup**
+
 ```javascript
 {
   "found": true,
@@ -288,6 +304,7 @@ Provide efficient access to schema elements that aren't included in the compress
 ```
 
 ### Validation Criteria
+
 - Accurately retrieves schema elements from full schema
 - Successfully resolves mappings between compressed and full schemas
 - Provides fast lookups (<100ms for non-cached elements)
@@ -296,6 +313,7 @@ Provide efficient access to schema elements that aren't included in the compress
 - Manages cache size and eviction policies
 
 ### Testing Strategy
+
 1. Test lookups for various element types (types, fields, interfaces, etc.)
 2. Verify mapping resolution for renamed and removed elements
 3. Test cache effectiveness with repeated lookups
@@ -306,9 +324,11 @@ Provide efficient access to schema elements that aren't included in the compress
 ## Step 3: Context-Aware Schema Provider
 
 ### Purpose
+
 Provide schema information tailored to specific contexts, enabling progressive loading of schema details based on current needs.
 
 ### Implementation Approach
+
 1. Implement context-based schema loading:
    - Core schema always available
    - Domain-specific schemas loaded on demand
@@ -394,6 +414,7 @@ Provide schema information tailored to specific contexts, enabling progressive l
 ```
 
 ### Validation Criteria
+
 - Correctly identifies required schema elements from context
 - Loads appropriate domains based on entity needs
 - Progressively expands schema as context evolves
@@ -402,6 +423,7 @@ Provide schema information tailored to specific contexts, enabling progressive l
 - Handles complex, multi-domain contexts effectively
 
 ### Testing Strategy
+
 1. Test context generation with various intents
 2. Verify domain loading based on entity references
 3. Test progressive context expansion
@@ -412,9 +434,11 @@ Provide schema information tailored to specific contexts, enabling progressive l
 ## Step 4: Schema Validation System
 
 ### Purpose
+
 Ensure that queries generated using the compressed schema remain valid against the full schema, providing confidence in the integrity of generated queries.
 
 ### Implementation Approach
+
 1. Implement validation of GraphQL queries:
    - Syntax validation
    - Schema compatibility checking
@@ -506,6 +530,7 @@ Ensure that queries generated using the compressed schema remain valid against t
 ```
 
 ### Validation Criteria
+
 - Correctly validates queries against both compressed and full schemas
 - Identifies fields and types not in compressed schema
 - Provides accurate error messages for invalid queries
@@ -514,6 +539,7 @@ Ensure that queries generated using the compressed schema remain valid against t
 - Identifies required schema expansions for query execution
 
 ### Testing Strategy
+
 1. Test validation with valid and invalid queries
 2. Verify error detection and message clarity
 3. Test with queries requiring schema expansion
@@ -526,6 +552,7 @@ Ensure that queries generated using the compressed schema remain valid against t
 The following tests verify the end-to-end functionality of all Phase 3 components:
 
 ### Test 1: Complete Lookup Pipeline
+
 1. Register a compressed schema in the registry
 2. Perform lookups for various element types
 3. Test cache effectiveness with repeated lookups
@@ -533,12 +560,14 @@ The following tests verify the end-to-end functionality of all Phase 3 component
 5. Verify context generation and expansion
 
 ### Test 2: Multi-Schema Lookup Comparison
+
 1. Register multiple schemas in the registry
 2. Compare lookup performance across schemas
 3. Test validation across different schema versions
 4. Verify cache effectiveness with different schemas
 
 ### Test 3: Progressive Schema Loading
+
 1. Start with core schema only
 2. Gradually expand context with additional domains
 3. Track context size growth with each expansion
@@ -549,24 +578,28 @@ The following tests verify the end-to-end functionality of all Phase 3 component
 Phase 3 will produce the following concrete deliverables:
 
 1. **Schema Registry**
+
    - Storage for full and compressed schemas
    - Version tracking system
    - Indexing for efficient lookup
    - Schema registration and retrieval APIs
 
 2. **Lookup Service**
+
    - Element lookup APIs
    - Mapping resolution system
    - Caching mechanism
    - Performance metrics
 
 3. **Context-Aware Schema Provider**
+
    - Context-based schema loading
    - Domain detection system
    - Progressive expansion mechanism
    - Context tracking
 
 4. **Schema Validation System**
+
    - Query validation against full and compressed schemas
    - Error detection and reporting
    - Query correction suggestions
@@ -583,18 +616,21 @@ Phase 3 will produce the following concrete deliverables:
 The following metrics will determine the success of Phase 3:
 
 1. **Lookup Performance**
+
    - Sub-100ms lookup times for non-cached elements
    - Sub-10ms lookup times for cached elements
-   - >80% cache hit rate after warm-up
+   - > 80% cache hit rate after warm-up
    - Linear scaling with schema size
 
 2. **Schema Context Efficiency**
+
    - 60-80% context size reduction compared to full schema
    - Accurate domain inclusion based on query needs
    - Progressive expansion without duplicating elements
    - Minimal context overhead
 
 3. **Validation Accuracy**
+
    - Correctly validates >99% of queries
    - Provides actionable error messages
    - Suggests accurate fixes for common errors

@@ -7,14 +7,24 @@ This document outlines the implementation approach for the Compression Engine ph
 ## Step 1: Field Pruning Engine
 
 ### Purpose
+
 Reduce schema size by removing redundant field descriptions, normalizing field names, and pruning deprecated fields while maintaining essential functionality.
 
 ### Implementation Approach
+
 1. Implement field description pruning with configurable verbosity levels
 2. Develop field name normalization to reduce redundancy
 3. Create detection and removal for deprecated fields
 4. Build redundant field identification and consolidation
 5. Generate field mapping records for the lookup system
+
+Field pruning will specifically employ:
+
+- Regular expression pattern matching for field name normalization
+- Levenshtein distance and other string similarity metrics for identifying similar fields
+- Word stemming and tokenization for semantic similarity detection
+- Field usage pattern analysis to identify redundant fields
+- Decision trees for configurable pruning logic based on field properties
 
 ### Field Pruning Configuration Options
 
@@ -67,6 +77,7 @@ Reduce schema size by removing redundant field descriptions, normalizing field n
 ```
 
 ### Validation Criteria
+
 - Preserves all essential fields while removing redundancy
 - Creates accurate mappings for renamed and removed fields
 - Maintains backward compatibility through mapping tables
@@ -75,6 +86,7 @@ Reduce schema size by removing redundant field descriptions, normalizing field n
 - Measures size reduction accurately
 
 ### Testing Strategy
+
 1. Test with different compression levels (0-3)
 2. Verify mapping accuracy for renamed and removed fields
 3. Test functionality preservation with sample queries
@@ -85,14 +97,24 @@ Reduce schema size by removing redundant field descriptions, normalizing field n
 ## Step 2: Type Consolidation Engine
 
 ### Purpose
+
 Reduce schema complexity by extracting common fields into interfaces and merging similar types to minimize redundancy.
 
 ### Implementation Approach
+
 1. Implement algorithms to identify similar types based on field overlap
 2. Create interface extraction for common fields
 3. Build type merging functionality for highly similar types
 4. Optimize enum types by combining similar values
 5. Generate comprehensive mapping information for lookup service
+
+Type consolidation will leverage:
+
+- Field signature comparison algorithms to detect structural similarity
+- Hierarchical clustering to identify groups of similar types
+- Interface extraction based on common field pattern detection
+- Jaccard similarity coefficient for measuring type overlap
+- Tree-based algorithms for constructing optimal type hierarchies
 
 ### Type Consolidation Configuration Options
 
@@ -119,21 +141,21 @@ Reduce schema complexity by extracting common fields into interfaces and merging
   },
   "mappings": {
     "mergedTypes": {
-      "AdminUser": { 
-        "mergedInto": "User", 
-        "originalFields": ["name", "email", "adminLevel", "permissions"] 
+      "AdminUser": {
+        "mergedInto": "User",
+        "originalFields": ["name", "email", "adminLevel", "permissions"]
       },
-      "GuestUser": { 
-        "mergedInto": "User", 
-        "originalFields": ["name", "email", "sessionExpiry"] 
+      "GuestUser": {
+        "mergedInto": "User",
+        "originalFields": ["name", "email", "sessionExpiry"]
       },
-      "Product": { 
-        "mergedInto": "Item", 
-        "originalFields": ["id", "name", "price", "inventory"] 
+      "Product": {
+        "mergedInto": "Item",
+        "originalFields": ["id", "name", "price", "inventory"]
       },
-      "Service": { 
-        "mergedInto": "Item", 
-        "originalFields": ["id", "name", "price", "duration"] 
+      "Service": {
+        "mergedInto": "Item",
+        "originalFields": ["id", "name", "price", "duration"]
       }
       // More merged types...
     },
@@ -167,6 +189,7 @@ Reduce schema complexity by extracting common fields into interfaces and merging
 ### Schema Examples Before and After Type Consolidation
 
 **Before:**
+
 ```graphql
 type User {
   id: ID!
@@ -191,6 +214,7 @@ type GuestUser {
 ```
 
 **After:**
+
 ```graphql
 interface UserInterface {
   id: ID!
@@ -209,6 +233,7 @@ type User implements UserInterface {
 ```
 
 ### Validation Criteria
+
 - Identifies similar types based on configurable thresholds
 - Creates interfaces that accurately represent common fields
 - Maintains schema integrity when merging types
@@ -217,6 +242,7 @@ type User implements UserInterface {
 - Measures size reduction accurately
 
 ### Testing Strategy
+
 1. Test similar type detection with various similarity thresholds
 2. Verify interface extraction with different type combinations
 3. Test type merging with similar and dissimilar types
@@ -227,14 +253,24 @@ type User implements UserInterface {
 ## Step 3: Domain Extractor
 
 ### Purpose
+
 Group related entity types into logical domains to support domain-specific schema views and progressive loading.
 
 ### Implementation Approach
+
 1. Implement community detection algorithms to identify type clusters
 2. Create domain boundary detection based on relationship analysis
 3. Build domain-specific schema extraction
 4. Generate cross-domain relationship mappings
 5. Create domain metadata for AI agent consumption
+
+Domain extraction will utilize:
+
+- Louvain method for community detection in entity relationship graphs
+- Modularity optimization to identify natural domain boundaries
+- Force-directed graph layout algorithms to visualize domain clustering
+- Betweenness centrality metrics to identify cross-domain interfaces
+- Normalized mutual information for evaluating clustering quality
 
 ### Domain Configuration Options
 
@@ -382,6 +418,7 @@ Group related entity types into logical domains to support domain-specific schem
 ```
 
 ### Validation Criteria
+
 - Correctly groups related entities into logical domains
 - Identifies cross-domain relationships accurately
 - Generates meaningful domain names and descriptions
@@ -390,6 +427,7 @@ Group related entity types into logical domains to support domain-specific schem
 - Verifies that cross-domain references are preserved
 
 ### Testing Strategy
+
 1. Test domain detection with various relationship structures
 2. Verify logical grouping against expected domains
 3. Test domain extraction with different algorithms
@@ -400,9 +438,11 @@ Group related entity types into logical domains to support domain-specific schem
 ## Step 4: Compressed Schema Generator
 
 ### Purpose
+
 Combine all compression techniques into a cohesive pipeline that produces an optimized schema with configurably reduced size.
 
 ### Implementation Approach
+
 1. Build a unified compression pipeline
 2. Create multiple compression levels for different needs
 3. Generate core compressed schema with essential elements
@@ -520,6 +560,7 @@ Combine all compression techniques into a cohesive pipeline that produces an opt
 ```
 
 ### Validation Criteria
+
 - Achieves target compression ratio (60-80% for core schema)
 - Preserves all essential functionality
 - Creates valid domain-specific schema views
@@ -528,6 +569,7 @@ Combine all compression techniques into a cohesive pipeline that produces an opt
 - Maintains valid GraphQL SDL syntax for all outputs
 
 ### Testing Strategy
+
 1. Test full compression pipeline with various schemas
 2. Verify compression ratio targets are met
 3. Validate functionality preservation with sample queries
@@ -540,6 +582,7 @@ Combine all compression techniques into a cohesive pipeline that produces an opt
 The following tests verify the end-to-end functionality of all Phase 2 components:
 
 ### Test 1: Complete Compression Pipeline
+
 1. Start with a raw schema from GitHub GraphQL API
 2. Run field pruning with different configurations
 3. Apply type consolidation with various thresholds
@@ -548,12 +591,14 @@ The following tests verify the end-to-end functionality of all Phase 2 component
 6. Verify compression ratio and functionality
 
 ### Test 2: Multi-Schema Compression Comparison
+
 1. Compress schemas from 3+ different GraphQL APIs
 2. Compare compression ratios and effectiveness
 3. Identify patterns in compression opportunities
 4. Test with different domain detection algorithms
 
 ### Test 3: Query Validation
+
 1. Generate a set of sample queries against original schema
 2. Verify these queries work against compressed schema
 3. Test queries that span multiple domains
@@ -564,24 +609,28 @@ The following tests verify the end-to-end functionality of all Phase 2 component
 Phase 2 will produce the following concrete deliverables:
 
 1. **Field Pruning Engine**
+
    - Field description removal/truncation
    - Field name normalization
    - Redundant field detection and removal
    - Field mapping generation
 
 2. **Type Consolidation Engine**
+
    - Similar type detection
    - Interface extraction
    - Type merging functionality
    - Mapping table generation
 
 3. **Domain Extractor**
+
    - Community detection algorithm implementation
    - Domain boundary identification
    - Domain-specific schema extraction
    - Cross-domain relationship mapping
 
 4. **Compressed Schema Generator**
+
    - Unified compression pipeline
    - Multi-level compression configurations
    - Core schema generator
@@ -600,12 +649,14 @@ Phase 2 will produce the following concrete deliverables:
 The following metrics will determine the success of Phase 2:
 
 1. **Compression Effectiveness**
+
    - Achieves 60-80% reduction in schema size for core schema
    - Maintains functionality equivalent to original schema
    - Creates logical domain groupings
    - Generates complete and accurate mapping information
 
 2. **Performance**
+
    - Compresses a 1000-type schema in <30 seconds
    - Generates domain extractions in <10 seconds
    - Maintains reasonable memory usage during compression

@@ -7,9 +7,11 @@ This document details the implementation approach for the Schema Ingestion & Ana
 ## Step 1: Schema Introspection System
 
 ### Purpose
+
 Create a robust system for retrieving GraphQL schema information through the standard introspection mechanism.
 
 ### Implementation Approach
+
 1. Implement a GraphQL introspection query handler that can:
    - Connect to remote GraphQL endpoints
    - Support authentication headers for secured APIs
@@ -19,6 +21,7 @@ Create a robust system for retrieving GraphQL schema information through the sta
 ### Input/Output Examples
 
 **Input:**
+
 ```javascript
 {
   "endpoint": "https://api.github.com/graphql",
@@ -29,6 +32,7 @@ Create a robust system for retrieving GraphQL schema information through the sta
 ```
 
 **Output:**
+
 ```javascript
 {
   "data": {
@@ -61,6 +65,7 @@ Create a robust system for retrieving GraphQL schema information through the sta
 ```
 
 ### Validation Criteria
+
 - Successfully connects to and retrieves schema from public GraphQL APIs
 - Handles authentication correctly for private APIs
 - Properly manages connection errors and timeouts
@@ -69,6 +74,7 @@ Create a robust system for retrieving GraphQL schema information through the sta
 - Handles large schemas without memory issues
 
 ### Testing Strategy
+
 1. Test against multiple public GraphQL APIs (GitHub, SpaceX, Yelp, etc.)
 2. Test authentication handling with appropriate tokens
 3. Test error cases (invalid endpoints, network failures, etc.)
@@ -78,9 +84,11 @@ Create a robust system for retrieving GraphQL schema information through the sta
 ## Step 2: Schema Parser & Representation
 
 ### Purpose
+
 Transform raw GraphQL introspection results into a standardized internal representation optimized for analysis and compression.
 
 ### Implementation Approach
+
 1. Design an internal schema representation with:
    - Efficient type and field lookup
    - Relationship tracking capabilities
@@ -100,10 +108,10 @@ Transform raw GraphQL introspection results into a standardized internal represe
       "description": "A user account",
       "fields": [
         {
-          "name": "id", 
-          "type": { 
-            "kind": "NON_NULL", 
-            "ofType": { "kind": "SCALAR", "name": "ID" } 
+          "name": "id",
+          "type": {
+            "kind": "NON_NULL",
+            "ofType": { "kind": "SCALAR", "name": "ID" }
           }
         },
         {
@@ -116,12 +124,12 @@ Transform raw GraphQL introspection results into a standardized internal represe
     },
     // More types...
   },
-  
+
   // Root operation types
   "queryType": "Query",
   "mutationType": "Mutation",
   "subscriptionType": null,
-  
+
   // Indexes for efficient lookups
   "typesByKind": {
     "OBJECT": ["User", "Repository", "Issue"],
@@ -129,13 +137,13 @@ Transform raw GraphQL introspection results into a standardized internal represe
     "ENUM": ["IssueState", "PullRequestState"],
     // Other kinds...
   },
-  
+
   // Field name lookup by parent type
   "fieldsByType": {
     "User": ["id", "name", "email", "bio"],
     // Other types...
   },
-  
+
   // Schema statistics
   "totalTypes": 124,
   "totalFields": 934,
@@ -144,6 +152,7 @@ Transform raw GraphQL introspection results into a standardized internal represe
 ```
 
 ### Validation Criteria
+
 - Correctly parses all GraphQL type kinds (Object, Interface, Union, etc.)
 - Preserves all schema information without loss
 - Creates efficient index structures for type and field lookup
@@ -152,6 +161,7 @@ Transform raw GraphQL introspection results into a standardized internal represe
 - Maintains reasonable memory usage for large schemas
 
 ### Testing Strategy
+
 1. Verify parsing of all GraphQL type kinds
 2. Test with various type wrapping combinations (NON_NULL, LIST)
 3. Check preservation of descriptions, deprecation info, and arguments
@@ -162,9 +172,11 @@ Transform raw GraphQL introspection results into a standardized internal represe
 ## Step 3: Relationship Analysis
 
 ### Purpose
+
 Analyze the schema structure to identify entity types and map the relationships between them, supporting domain extraction in later phases.
 
 ### Implementation Approach
+
 1. Develop algorithms to:
    - Identify entity types (objects with IDs or that implement Node)
    - Map relationships between entities based on field types
@@ -172,26 +184,34 @@ Analyze the schema structure to identify entity types and map the relationships 
    - Identify common GraphQL patterns (connections, pagination)
 2. Create a graph representation of schema relationships
 
+The relationship analysis will specifically use:
+
+- AST-based traversal of schema structure to extract entity references
+- Graph-based representation of schema relationships
+- Louvain community detection algorithm for identifying naturally occurring clusters
+- Type and field reference pattern analysis to detect foreign key relationships
+- BFS/DFS graph traversal to identify connected entity components
+
 ### Relationship Analysis Output
 
 ```javascript
 {
   // Primary entity types
   "entityTypes": ["User", "Repository", "Issue", "PullRequest"],
-  
+
   // Outgoing references
   "references": {
     "Repository": ["User"],         // Repository references User
     "Issue": ["User", "Repository"], // Issue references User and Repository
     "PullRequest": ["User", "Repository"]
   },
-  
+
   // Incoming references
   "referencedBy": {
     "User": ["Repository", "Issue", "PullRequest"],
     "Repository": ["Issue", "PullRequest"]
   },
-  
+
   // Foreign key patterns
   "foreignKeys": {
     "Issue": {
@@ -200,7 +220,7 @@ Analyze the schema structure to identify entity types and map the relationships 
     },
     // More foreign keys...
   },
-  
+
   // Connection patterns (Relay-style pagination)
   "connectionTypes": [
     {
@@ -210,7 +230,7 @@ Analyze the schema structure to identify entity types and map the relationships 
     },
     // More connections...
   ],
-  
+
   // Interface implementations
   "implementations": {
     "Node": ["User", "Repository", "Issue"]
@@ -219,6 +239,7 @@ Analyze the schema structure to identify entity types and map the relationships 
 ```
 
 ### Validation Criteria
+
 - Correctly identifies entity types with unique identifiers
 - Maps relationships between entities in both directions
 - Detects foreign key patterns according to GraphQL naming conventions
@@ -227,6 +248,7 @@ Analyze the schema structure to identify entity types and map the relationships 
 - Handles circular references appropriately
 
 ### Testing Strategy
+
 1. Test entity identification with various ID patterns
 2. Verify relationship mapping with sample schemas
 3. Test foreign key detection with conventional and unconventional naming
@@ -237,15 +259,25 @@ Analyze the schema structure to identify entity types and map the relationships 
 ## Step 4: Schema Statistics Generation
 
 ### Purpose
+
 Calculate metrics about the schema to guide compression decisions and identify potential optimization opportunities.
 
 ### Implementation Approach
+
 1. Create algorithms to:
    - Calculate basic schema complexity metrics
    - Identify similar types that could be consolidated
    - Detect redundant field patterns
    - Generate schema fingerprints for change detection
 2. Establish a baseline for measuring compression effectiveness
+
+The statistics generation will utilize:
+
+- Levenshtein distance and Jaccard similarity for detecting similar field names
+- Term frequency analysis to identify common naming patterns
+- Hierarchical clustering to group similar types
+- Fingerprinting algorithms (e.g., SimHash) for schema change detection
+- Quantitative metrics for relationship density and type connectivity
 
 ### Schema Statistics Output
 
@@ -257,7 +289,7 @@ Calculate metrics about the schema to guide compression decisions and identify p
   "totalFields": 342,
   "totalEnumValues": 78,
   "totalInputFields": 96,
-  
+
   // Type distribution
   "typeDistribution": {
     "OBJECT": 28,
@@ -267,58 +299,59 @@ Calculate metrics about the schema to guide compression decisions and identify p
     "INPUT_OBJECT": 14,
     "SCALAR": 2
   },
-  
+
   // Complexity metrics
   "avgFieldsPerType": 6.0,
   "maxFieldsInType": 24,
   "relationshipDensity": 0.27,  // How interconnected the entities are
-  
+
   // Potential compression targets
   "similarTypeGroups": [
-    { 
-      "name": "UserGroup", 
+    {
+      "name": "UserGroup",
       "baseType": "User",
-      "similarTypes": ["AdminUser", "GuestUser"], 
-      "similarity": 0.85 
+      "similarTypes": ["AdminUser", "GuestUser"],
+      "similarity": 0.85
     },
-    { 
-      "name": "ItemGroup", 
+    {
+      "name": "ItemGroup",
       "baseType": "Product",
-      "similarTypes": ["Service", "Subscription"], 
-      "similarity": 0.73 
+      "similarTypes": ["Service", "Subscription"],
+      "similarity": 0.73
     }
   ],
-  
+
   // Redundant field patterns
   "redundantFieldPatterns": [
-    { 
-      "pattern": "timestamp fields", 
-      "fields": ["createdAt", "updatedAt", "deletedAt"], 
-      "occurrences": 32 
+    {
+      "pattern": "timestamp fields",
+      "fields": ["createdAt", "updatedAt", "deletedAt"],
+      "occurrences": 32
     },
-    { 
-      "pattern": "name variations", 
-      "fields": ["name", "title", "label"], 
-      "occurrences": 18 
+    {
+      "pattern": "name variations",
+      "fields": ["name", "title", "label"],
+      "occurrences": 18
     }
   ],
-  
+
   // Common prefix analysis
   "commonPrefixes": [
     { "prefix": "user", "count": 14 },
     { "prefix": "repository", "count": 11 },
     { "prefix": "issue", "count": 9 }
   ],
-  
+
   // Size metrics
   "schemaSize": 42680, // approximate byte size
-  
+
   // Change detection
   "fingerprint": "a1b2c3d4e5f6g7h8i9j0"
 }
 ```
 
 ### Validation Criteria
+
 - Generates accurate statistics for schema complexity
 - Correctly identifies similar types based on field overlap
 - Detects redundant field patterns across the schema
@@ -327,6 +360,7 @@ Calculate metrics about the schema to guide compression decisions and identify p
 - Handles large schemas efficiently
 
 ### Testing Strategy
+
 1. Verify statistic calculations with sample schemas
 2. Test similar type detection with various similarity thresholds
 3. Validate redundant field pattern detection
@@ -339,6 +373,7 @@ Calculate metrics about the schema to guide compression decisions and identify p
 The following tests verify the end-to-end functionality of all Phase 1 components:
 
 ### Test 1: Complete Processing Pipeline
+
 1. Introspect the GitHub GraphQL API
 2. Parse into internal representation
 3. Analyze entity relationships
@@ -346,11 +381,13 @@ The following tests verify the end-to-end functionality of all Phase 1 component
 5. Verify outputs at each stage
 
 ### Test 2: Multiple API Comparison
+
 1. Process schemas from GitHub, SpaceX, and Yelp APIs
 2. Compare relationship structures
 3. Validate consistency of analysis across different schema designs
 
 ### Test 3: Large Schema Handling
+
 1. Process a large enterprise GraphQL schema (1000+ types)
 2. Measure memory usage and processing time
 3. Verify accuracy of analysis with large datasets
@@ -360,21 +397,25 @@ The following tests verify the end-to-end functionality of all Phase 1 component
 Phase 1 will produce the following concrete deliverables:
 
 1. **Schema Introspection Module**
+
    - API for retrieving GraphQL schemas
    - Support for authentication and error handling
    - File loading capabilities for local schemas
 
 2. **Schema Parser**
+
    - Standardized internal schema representation
    - Efficient indexing for types and fields
    - Traversal utilities
 
 3. **Relationship Analyzer**
+
    - Entity type detection
    - Relationship mapping
    - Foreign key identification
 
 4. **Statistics Generator**
+
    - Schema complexity metrics
    - Compression opportunity identification
    - Schema fingerprinting
@@ -390,11 +431,13 @@ Phase 1 will produce the following concrete deliverables:
 The following metrics will determine the success of Phase 1:
 
 1. **Functional Completeness**
+
    - Successfully processes schemas from 3+ GraphQL APIs
    - Correctly identifies >95% of entity relationships
    - Provides accurate statistics for guiding compression
 
 2. **Performance**
+
    - Processes a 1000-type schema in <5 seconds
    - Maintains memory usage below 500MB for large schemas
    - Achieves >90% test coverage
