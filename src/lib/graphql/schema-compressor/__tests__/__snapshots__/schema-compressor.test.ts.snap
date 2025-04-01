@@ -1,7 +1,55 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Schema Compressor Snapshots should match snapshot 1`] = `
+exports[`Schema Compressor Snapshots Mock Character Type should match snapshot 1`] = `
 {
+  "directives": [
+    {
+      "args": [
+        {
+          "name": "if",
+          "type": "Boolean!",
+        },
+      ],
+      "description": "Directs the executor to include this field or fragment only when the \`if\` argument is true",
+      "locations": [
+        "FIELD",
+        "FRAGMENT_SPREAD",
+        "INLINE_FRAGMENT",
+      ],
+      "name": "include",
+    },
+    {
+      "args": [
+        {
+          "name": "if",
+          "type": "Boolean!",
+        },
+      ],
+      "description": "Directs the executor to skip this field or fragment when the \`if\`'argument is true.",
+      "locations": [
+        "FIELD",
+        "FRAGMENT_SPREAD",
+        "INLINE_FRAGMENT",
+      ],
+      "name": "skip",
+    },
+    {
+      "args": [
+        {
+          "default": ""No longer supported"",
+          "name": "reason",
+          "type": "String!",
+        },
+      ],
+      "description": "Marks the field or enum value as deprecated",
+      "locations": [
+        "FIELD_DEFINITION",
+        "ENUM_VALUE",
+      ],
+      "name": "deprecated",
+    },
+  ],
+  "queryType": "Query",
   "types": {
     "Character": {
       "description": "A character from the Rick and Morty universe",
@@ -24,6 +72,643 @@ exports[`Schema Compressor Snapshots should match snapshot 1`] = `
       ],
       "kind": "OBJECT",
       "name": "Character",
+    },
+  },
+}
+`;
+
+exports[`Schema Compressor Snapshots Rick and Morty Complete schema should match snapshot 1`] = `
+{
+  "directives": [
+    {
+      "args": [
+        {
+          "name": "maxAge",
+          "type": "Int",
+        },
+        {
+          "name": "scope",
+          "type": "CacheControlScope",
+        },
+      ],
+      "locations": [
+        "FIELD_DEFINITION",
+        "OBJECT",
+        "INTERFACE",
+      ],
+      "name": "cacheControl",
+    },
+    {
+      "args": [
+        {
+          "name": "if",
+          "type": "Boolean!",
+        },
+      ],
+      "description": "Directs the executor to skip this field or fragment when the \`if\` argument is true.",
+      "locations": [
+        "FIELD",
+        "FRAGMENT_SPREAD",
+        "INLINE_FRAGMENT",
+      ],
+      "name": "skip",
+    },
+    {
+      "args": [
+        {
+          "name": "if",
+          "type": "Boolean!",
+        },
+      ],
+      "description": "Directs the executor to include this field or fragment only when the \`if\` argument is true.",
+      "locations": [
+        "FIELD",
+        "FRAGMENT_SPREAD",
+        "INLINE_FRAGMENT",
+      ],
+      "name": "include",
+    },
+    {
+      "args": [
+        {
+          "default": ""No longer supported"",
+          "name": "reason",
+          "type": "String",
+        },
+      ],
+      "description": "Marks an element of a GraphQL schema as no longer supported.",
+      "locations": [
+        "FIELD_DEFINITION",
+        "ENUM_VALUE",
+      ],
+      "name": "deprecated",
+    },
+  ],
+  "queryType": "Query",
+  "types": {
+    "Boolean": {
+      "description": "The \`Boolean\` scalar type represents \`true\` or \`false\`.",
+      "kind": "SCALAR",
+      "name": "Boolean",
+    },
+    "CacheControlScope": {
+      "kind": "ENUM",
+      "name": "CacheControlScope",
+    },
+    "Character": {
+      "fields": [
+        {
+          "description": "The id of the character.",
+          "name": "id",
+          "type": "ID",
+        },
+        {
+          "description": "The name of the character.",
+          "name": "name",
+          "type": "String",
+        },
+        {
+          "description": "The status of the character ('Alive', 'Dead' or 'unknown').",
+          "name": "status",
+          "type": "String",
+        },
+        {
+          "description": "The species of the character.",
+          "name": "species",
+          "type": "String",
+        },
+        {
+          "description": "The type or subspecies of the character.",
+          "name": "type",
+          "type": "String",
+        },
+        {
+          "description": "The gender of the character ('Female', 'Male', 'Genderless' or 'unknown').",
+          "name": "gender",
+          "type": "String",
+        },
+        {
+          "description": "The character's origin location",
+          "name": "origin",
+          "type": "Location",
+        },
+        {
+          "description": "The character's last known location",
+          "name": "location",
+          "type": "Location",
+        },
+        {
+          "description": "Link to the character's image.
+All images are 300x300px and most are medium shots or portraits since they are intended to be used as avatars.",
+          "name": "image",
+          "type": "String",
+        },
+        {
+          "description": "Episodes in which this character appeared.",
+          "name": "episode",
+          "type": "[Episode]!",
+        },
+        {
+          "description": "Time at which the character was created in the database.",
+          "name": "created",
+          "type": "String",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "Character",
+    },
+    "Characters": {
+      "fields": [
+        {
+          "name": "info",
+          "type": "Info",
+        },
+        {
+          "name": "results",
+          "type": "[Character]",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "Characters",
+    },
+    "Episode": {
+      "fields": [
+        {
+          "description": "The id of the episode.",
+          "name": "id",
+          "type": "ID",
+        },
+        {
+          "description": "The name of the episode.",
+          "name": "name",
+          "type": "String",
+        },
+        {
+          "description": "The air date of the episode.",
+          "name": "air_date",
+          "type": "String",
+        },
+        {
+          "description": "The code of the episode.",
+          "name": "episode",
+          "type": "String",
+        },
+        {
+          "description": "List of characters who have been seen in the episode.",
+          "name": "characters",
+          "type": "[Character]!",
+        },
+        {
+          "description": "Time at which the episode was created in the database.",
+          "name": "created",
+          "type": "String",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "Episode",
+    },
+    "Episodes": {
+      "fields": [
+        {
+          "name": "info",
+          "type": "Info",
+        },
+        {
+          "name": "results",
+          "type": "[Episode]",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "Episodes",
+    },
+    "FilterCharacter": {
+      "kind": "INPUT_OBJECT",
+      "name": "FilterCharacter",
+    },
+    "FilterEpisode": {
+      "kind": "INPUT_OBJECT",
+      "name": "FilterEpisode",
+    },
+    "FilterLocation": {
+      "kind": "INPUT_OBJECT",
+      "name": "FilterLocation",
+    },
+    "ID": {
+      "description": "The \`ID\` scalar type represents a unique identifier, often used to refetch an object or as key for a cache. The ID type appears in a JSON response as a String; however, it is not intended to be human-readable. When expected as an input type, any string (such as \`"4"\`) or integer (such as \`4\`) input value will be accepted as an ID.",
+      "kind": "SCALAR",
+      "name": "ID",
+    },
+    "Info": {
+      "fields": [
+        {
+          "description": "The length of the response.",
+          "name": "count",
+          "type": "Int",
+        },
+        {
+          "description": "The amount of pages.",
+          "name": "pages",
+          "type": "Int",
+        },
+        {
+          "description": "Number of the next page (if it exists)",
+          "name": "next",
+          "type": "Int",
+        },
+        {
+          "description": "Number of the previous page (if it exists)",
+          "name": "prev",
+          "type": "Int",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "Info",
+    },
+    "Int": {
+      "description": "The \`Int\` scalar type represents non-fractional signed whole numeric values. Int can represent values between -(2^31) and 2^31 - 1.",
+      "kind": "SCALAR",
+      "name": "Int",
+    },
+    "Location": {
+      "fields": [
+        {
+          "description": "The id of the location.",
+          "name": "id",
+          "type": "ID",
+        },
+        {
+          "description": "The name of the location.",
+          "name": "name",
+          "type": "String",
+        },
+        {
+          "description": "The type of the location.",
+          "name": "type",
+          "type": "String",
+        },
+        {
+          "description": "The dimension in which the location is located.",
+          "name": "dimension",
+          "type": "String",
+        },
+        {
+          "description": "List of characters who have been last seen in the location.",
+          "name": "residents",
+          "type": "[Character]!",
+        },
+        {
+          "description": "Time at which the location was created in the database.",
+          "name": "created",
+          "type": "String",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "Location",
+    },
+    "Locations": {
+      "fields": [
+        {
+          "name": "info",
+          "type": "Info",
+        },
+        {
+          "name": "results",
+          "type": "[Location]",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "Locations",
+    },
+    "Query": {
+      "fields": [
+        {
+          "args": [
+            {
+              "name": "id",
+              "type": "ID!",
+            },
+          ],
+          "description": "Get a specific character by ID",
+          "name": "character",
+          "type": "Character",
+        },
+        {
+          "args": [
+            {
+              "name": "page",
+              "type": "Int",
+            },
+            {
+              "name": "filter",
+              "type": "FilterCharacter",
+            },
+          ],
+          "description": "Get the list of all characters",
+          "name": "characters",
+          "type": "Characters",
+        },
+        {
+          "args": [
+            {
+              "name": "ids",
+              "type": "[ID!]!",
+            },
+          ],
+          "description": "Get a list of characters selected by ids",
+          "name": "charactersByIds",
+          "type": "[Character]",
+        },
+        {
+          "args": [
+            {
+              "name": "id",
+              "type": "ID!",
+            },
+          ],
+          "description": "Get a specific locations by ID",
+          "name": "location",
+          "type": "Location",
+        },
+        {
+          "args": [
+            {
+              "name": "page",
+              "type": "Int",
+            },
+            {
+              "name": "filter",
+              "type": "FilterLocation",
+            },
+          ],
+          "description": "Get the list of all locations",
+          "name": "locations",
+          "type": "Locations",
+        },
+        {
+          "args": [
+            {
+              "name": "ids",
+              "type": "[ID!]!",
+            },
+          ],
+          "description": "Get a list of locations selected by ids",
+          "name": "locationsByIds",
+          "type": "[Location]",
+        },
+        {
+          "args": [
+            {
+              "name": "id",
+              "type": "ID!",
+            },
+          ],
+          "description": "Get a specific episode by ID",
+          "name": "episode",
+          "type": "Episode",
+        },
+        {
+          "args": [
+            {
+              "name": "page",
+              "type": "Int",
+            },
+            {
+              "name": "filter",
+              "type": "FilterEpisode",
+            },
+          ],
+          "description": "Get the list of all episodes",
+          "name": "episodes",
+          "type": "Episodes",
+        },
+        {
+          "args": [
+            {
+              "name": "ids",
+              "type": "[ID!]!",
+            },
+          ],
+          "description": "Get a list of episodes selected by ids",
+          "name": "episodesByIds",
+          "type": "[Episode]",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "Query",
+    },
+    "String": {
+      "description": "The \`String\` scalar type represents textual data, represented as UTF-8 character sequences. The String type is most often used by GraphQL to represent free-form human-readable text.",
+      "kind": "SCALAR",
+      "name": "String",
+    },
+    "Upload": {
+      "description": "The \`Upload\` scalar type represents a file upload.",
+      "kind": "SCALAR",
+      "name": "Upload",
+    },
+    "__Directive": {
+      "description": "A Directive provides a way to describe alternate runtime execution and type validation behavior in a GraphQL document.
+
+In some cases, you need to provide options to alter GraphQL's execution behavior in ways field arguments will not suffice, such as conditionally including or skipping a field. Directives provide this by describing additional information to the executor.",
+      "fields": [
+        {
+          "name": "name",
+          "type": "String!",
+        },
+        {
+          "name": "description",
+          "type": "String",
+        },
+        {
+          "name": "locations",
+          "type": "[__DirectiveLocation!]!",
+        },
+        {
+          "name": "args",
+          "type": "[__InputValue!]!",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "__Directive",
+    },
+    "__DirectiveLocation": {
+      "description": "A Directive can be adjacent to many parts of the GraphQL language, a __DirectiveLocation describes one such possible adjacencies.",
+      "kind": "ENUM",
+      "name": "__DirectiveLocation",
+    },
+    "__EnumValue": {
+      "description": "One possible value for a given Enum. Enum values are unique values, not a placeholder for a string or numeric value. However an Enum value is returned in a JSON response as a string.",
+      "fields": [
+        {
+          "name": "name",
+          "type": "String!",
+        },
+        {
+          "name": "description",
+          "type": "String",
+        },
+        {
+          "name": "isDeprecated",
+          "type": "Boolean!",
+        },
+        {
+          "name": "deprecationReason",
+          "type": "String",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "__EnumValue",
+    },
+    "__Field": {
+      "description": "Object and Interface types are described by a list of Fields, each of which has a name, potentially a list of arguments, and a return type.",
+      "fields": [
+        {
+          "name": "name",
+          "type": "String!",
+        },
+        {
+          "name": "description",
+          "type": "String",
+        },
+        {
+          "name": "args",
+          "type": "[__InputValue!]!",
+        },
+        {
+          "name": "type",
+          "type": "__Type!",
+        },
+        {
+          "name": "isDeprecated",
+          "type": "Boolean!",
+        },
+        {
+          "name": "deprecationReason",
+          "type": "String",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "__Field",
+    },
+    "__InputValue": {
+      "description": "Arguments provided to Fields or Directives and the input fields of an InputObject are represented as Input Values which describe their type and optionally a default value.",
+      "fields": [
+        {
+          "name": "name",
+          "type": "String!",
+        },
+        {
+          "name": "description",
+          "type": "String",
+        },
+        {
+          "name": "type",
+          "type": "__Type!",
+        },
+        {
+          "description": "A GraphQL-formatted string representing the default value for this input value.",
+          "name": "defaultValue",
+          "type": "String",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "__InputValue",
+    },
+    "__Schema": {
+      "description": "A GraphQL Schema defines the capabilities of a GraphQL server. It exposes all available types and directives on the server, as well as the entry points for query, mutation, and subscription operations.",
+      "fields": [
+        {
+          "description": "A list of all types supported by this server.",
+          "name": "types",
+          "type": "[__Type!]!",
+        },
+        {
+          "description": "The type that query operations will be rooted at.",
+          "name": "queryType",
+          "type": "__Type!",
+        },
+        {
+          "description": "If this server supports mutation, the type that mutation operations will be rooted at.",
+          "name": "mutationType",
+          "type": "__Type",
+        },
+        {
+          "description": "If this server support subscription, the type that subscription operations will be rooted at.",
+          "name": "subscriptionType",
+          "type": "__Type",
+        },
+        {
+          "description": "A list of all directives supported by this server.",
+          "name": "directives",
+          "type": "[__Directive!]!",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "__Schema",
+    },
+    "__Type": {
+      "description": "The fundamental unit of any GraphQL Schema is the type. There are many kinds of types in GraphQL as represented by the \`__TypeKind\` enum.
+
+Depending on the kind of a type, certain fields describe information about that type. Scalar types provide no information beyond a name and description, while Enum types provide their values. Object and Interface types provide the fields they describe. Abstract types, Union and Interface, provide the Object types possible at runtime. List and NonNull types compose other types.",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "__TypeKind!",
+        },
+        {
+          "name": "name",
+          "type": "String",
+        },
+        {
+          "name": "description",
+          "type": "String",
+        },
+        {
+          "args": [
+            {
+              "default": "false",
+              "name": "includeDeprecated",
+              "type": "Boolean",
+            },
+          ],
+          "name": "fields",
+          "type": "[__Field!]",
+        },
+        {
+          "name": "interfaces",
+          "type": "[__Type!]",
+        },
+        {
+          "name": "possibleTypes",
+          "type": "[__Type!]",
+        },
+        {
+          "args": [
+            {
+              "default": "false",
+              "name": "includeDeprecated",
+              "type": "Boolean",
+            },
+          ],
+          "name": "enumValues",
+          "type": "[__EnumValue!]",
+        },
+        {
+          "name": "inputFields",
+          "type": "[__InputValue!]",
+        },
+        {
+          "name": "ofType",
+          "type": "__Type",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "__Type",
+    },
+    "__TypeKind": {
+      "description": "An enum describing what kind of type a given \`__Type\` is.",
+      "kind": "ENUM",
+      "name": "__TypeKind",
     },
   },
 }

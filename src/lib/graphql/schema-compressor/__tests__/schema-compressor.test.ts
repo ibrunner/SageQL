@@ -1,18 +1,79 @@
 import { describe, it, expect } from "@jest/globals";
 import schemaCompressor from "../schema-compressor.js";
+import rickAndMortySchema from "./mocks/rick-and-morty-full-schema.js";
 
 describe("Schema Compressor", () => {
   describe("Snapshots", () => {
-    it("should match snapshot", () => {
-      const schema = { types: { Character: mockCharacterType } };
+    it("Mock Character Type should match snapshot", () => {
+      const schema = {
+        __schema: {
+          queryType: {
+            name: "Query",
+          },
+          types: [mockCharacterType],
+          directives: mockDirectives,
+        },
+      };
       const compressed = schemaCompressor(schema);
       expect(compressed).toMatchSnapshot();
+    });
+
+    it("Rick and Morty Complete schema should match snapshot", () => {
+      const compressed = schemaCompressor(rickAndMortySchema);
+      expect(compressed).toMatchSnapshot();
+    });
+  });
+
+  describe("Schema Structure", () => {
+    it("should throw error if __schema property is missing", () => {
+      const schema = { types: { Character: mockCharacterType } };
+      expect(() => schemaCompressor(schema)).toThrow(
+        "Invalid schema: missing __schema property",
+      );
+    });
+
+    it("should include root operation types when present", () => {
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          mutationType: { name: "Mutation" },
+          subscriptionType: { name: "Subscription" },
+          types: [mockCharacterType],
+          directives: [],
+        },
+      };
+      const compressed = schemaCompressor(schema);
+
+      expect(compressed.queryType).toBe("Query");
+      expect(compressed.mutationType).toBe("Mutation");
+      expect(compressed.subscriptionType).toBe("Subscription");
+    });
+
+    it("should handle missing optional root types", () => {
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [mockCharacterType],
+          directives: [],
+        },
+      };
+      const compressed = schemaCompressor(schema);
+
+      expect(compressed.queryType).toBe("Query");
+      expect(compressed.mutationType).toBeUndefined();
+      expect(compressed.subscriptionType).toBeUndefined();
     });
   });
 
   describe("Step 1: Description Removal", () => {
     it("should keep all descriptions by default", () => {
-      const schema = { types: { Character: mockCharacterType } };
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [mockCharacterType],
+          directives: mockDirectives,
+        },
+      };
       const compressed = schemaCompressor(schema);
 
       expect(compressed.types.Character.description).toBe(
@@ -21,10 +82,19 @@ describe("Schema Compressor", () => {
       expect(compressed.types.Character.fields[0].description).toBe(
         "The id of the character.",
       );
+      expect(compressed.directives[0].description).toBe(
+        "Directs the executor to include this field or fragment only when the `if` argument is true",
+      );
     });
 
     it("should remove all descriptions when removeDescriptions is true and preserveEssentialDescriptions is false", () => {
-      const schema = { types: { Character: mockCharacterType } };
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [mockCharacterType],
+          directives: mockDirectives,
+        },
+      };
       const compressed = schemaCompressor(schema, {
         removeDescriptions: true,
         preserveEssentialDescriptions: false,
@@ -32,10 +102,17 @@ describe("Schema Compressor", () => {
 
       expect(compressed.types.Character.description).toBeUndefined();
       expect(compressed.types.Character.fields[0].description).toBeUndefined();
+      expect(compressed.directives[0].description).toBeUndefined();
     });
 
     it("should preserve only OBJECT descriptions when preserveEssentialDescriptions is true", () => {
-      const schema = { types: { Character: mockCharacterType } };
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [mockCharacterType],
+          directives: mockDirectives,
+        },
+      };
       const compressed = schemaCompressor(schema, {
         removeDescriptions: true,
         preserveEssentialDescriptions: true,
@@ -47,6 +124,8 @@ describe("Schema Compressor", () => {
       );
       // Field descriptions should still be removed
       expect(compressed.types.Character.fields[0].description).toBeUndefined();
+      // Directive descriptions should be removed
+      expect(compressed.directives[0].description).toBeUndefined();
     });
 
     it("should handle types without descriptions gracefully", () => {
@@ -58,7 +137,13 @@ describe("Schema Compressor", () => {
           description: undefined,
         })),
       };
-      const schema = { types: { Character: typeWithoutDescription } };
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [typeWithoutDescription],
+          directives: [],
+        },
+      };
       const compressed = schemaCompressor(schema);
 
       expect(compressed.types.Character.description).toBeUndefined();
@@ -68,7 +153,13 @@ describe("Schema Compressor", () => {
 
   describe("Step 2: Deprecation Pruning", () => {
     it("should remove deprecated fields when removeDeprecated is true", () => {
-      const schema = { types: { User: mockDeprecatedFieldType } };
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [mockDeprecatedFieldType],
+          directives: [],
+        },
+      };
       const compressed = schemaCompressor(schema, { removeDeprecated: true });
 
       const fields = compressed.types.User.fields;
@@ -78,7 +169,13 @@ describe("Schema Compressor", () => {
     });
 
     it("should keep deprecated fields when removeDeprecated is false", () => {
-      const schema = { types: { User: mockDeprecatedFieldType } };
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [mockDeprecatedFieldType],
+          directives: [],
+        },
+      };
       const compressed = schemaCompressor(schema, { removeDeprecated: false });
 
       const fields = compressed.types.User.fields;
@@ -89,7 +186,13 @@ describe("Schema Compressor", () => {
 
   describe("Step 3: Empty/Null Field Pruning", () => {
     it("should remove empty arrays and null values", () => {
-      const schema = { types: { Character: mockCharacterType } };
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [mockCharacterType],
+          directives: [],
+        },
+      };
       const compressed = schemaCompressor(schema);
 
       expect(compressed.types.Character.inputFields).toBeUndefined();
@@ -99,7 +202,13 @@ describe("Schema Compressor", () => {
     });
 
     it("should remove empty args arrays from fields", () => {
-      const schema = { types: { Character: mockCharacterType } };
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [mockCharacterType],
+          directives: [],
+        },
+      };
       const compressed = schemaCompressor(schema);
 
       compressed.types.Character.fields.forEach((field: any) => {
@@ -110,7 +219,13 @@ describe("Schema Compressor", () => {
 
   describe("Step 4: Type Reference Normalization", () => {
     it("should normalize complex nested type references into string notation", () => {
-      const schema = { types: { Character: mockCharacterType } };
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [mockCharacterType],
+          directives: [],
+        },
+      };
       const compressed = schemaCompressor(schema);
 
       const episodeField = compressed.types.Character.fields.find(
@@ -120,7 +235,13 @@ describe("Schema Compressor", () => {
     });
 
     it("should handle simple scalar types", () => {
-      const schema = { types: { Character: mockCharacterType } };
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [mockCharacterType],
+          directives: [],
+        },
+      };
       const compressed = schemaCompressor(schema);
 
       const idField = compressed.types.Character.fields.find(
@@ -132,7 +253,13 @@ describe("Schema Compressor", () => {
 
   describe("Step 5: Directives Handling", () => {
     it("should compress directive definitions", () => {
-      const schema = { types: { FieldWithDirectives: mockDirectiveType } };
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [mockDirectiveType],
+          directives: mockDirectives,
+        },
+      };
       const compressed = schemaCompressor(schema);
 
       const statusField = compressed.types.FieldWithDirectives.fields[0];
@@ -148,42 +275,33 @@ describe("Schema Compressor", () => {
         ],
       });
     });
+
+    it("should handle schema-level directives", () => {
+      const schema = {
+        __schema: {
+          queryType: { name: "Query" },
+          types: [],
+          directives: mockDirectives,
+        },
+      };
+      const compressed = schemaCompressor(schema);
+
+      expect(compressed.directives).toBeDefined();
+      expect(compressed.directives.length).toBe(3);
+      expect(compressed.directives[0]).toEqual({
+        name: "include",
+        description:
+          "Directs the executor to include this field or fragment only when the `if` argument is true",
+        args: [
+          {
+            name: "if",
+            type: "Boolean!",
+          },
+        ],
+        locations: ["FIELD", "FRAGMENT_SPREAD", "INLINE_FRAGMENT"],
+      });
+    });
   });
-
-  // describe("Complete Schema Compression", () => {
-  //   it("should produce a correctly compressed schema", () => {
-  //     const schema = { types: { Character: mockCharacterType } };
-  //     const compressed = schemaCompressor(schema);
-
-  //     // Expected structure based on documentation example
-  //     expect(compressed).toEqual({
-  //       types: {
-  //         Character: {
-  //           kind: "OBJECT",
-  //           name: "Character",
-  //           description: "A character from the Rick and Morty universe",
-  //           fields: [
-  //             {
-  //               name: "id",
-  //               description: "The id of the character.",
-  //               type: "ID",
-  //             },
-  //             {
-  //               name: "name",
-  //               description: "The name of the character.",
-  //               type: "String",
-  //             },
-  //             {
-  //               name: "episode",
-  //               description: "Episodes in which this character appeared.",
-  //               type: "[Episode]!",
-  //             },
-  //           ],
-  //         },
-  //       },
-  //     });
-  //   });
-  // });
 });
 
 // Mock objects based on documentation examples
@@ -319,3 +437,71 @@ const mockDirectiveType = {
     },
   ],
 };
+
+const mockDirectives = [
+  {
+    name: "include",
+    description:
+      "Directs the executor to include this field or fragment only when the `if` argument is true",
+    locations: ["FIELD", "FRAGMENT_SPREAD", "INLINE_FRAGMENT"],
+    args: [
+      {
+        name: "if",
+        description: "Included when true.",
+        type: {
+          kind: "NON_NULL",
+          name: null,
+          ofType: {
+            kind: "SCALAR",
+            name: "Boolean",
+            ofType: null,
+          },
+        },
+        defaultValue: null,
+      },
+    ],
+  },
+  {
+    name: "skip",
+    description:
+      "Directs the executor to skip this field or fragment when the `if`'argument is true.",
+    locations: ["FIELD", "FRAGMENT_SPREAD", "INLINE_FRAGMENT"],
+    args: [
+      {
+        name: "if",
+        description: "Skipped when true.",
+        type: {
+          kind: "NON_NULL",
+          name: null,
+          ofType: {
+            kind: "SCALAR",
+            name: "Boolean",
+            ofType: null,
+          },
+        },
+        defaultValue: null,
+      },
+    ],
+  },
+  {
+    name: "deprecated",
+    description: "Marks the field or enum value as deprecated",
+    locations: ["FIELD_DEFINITION", "ENUM_VALUE"],
+    args: [
+      {
+        name: "reason",
+        description: "The reason for the deprecation",
+        type: {
+          kind: "NON_NULL",
+          name: null,
+          ofType: {
+            kind: "SCALAR",
+            name: "String",
+            ofType: null,
+          },
+        },
+        defaultValue: '"No longer supported"',
+      },
+    ],
+  },
+];

@@ -20,6 +20,16 @@ interface GraphQLType {
   deprecationReason?: string | null;
 }
 
+interface GraphQLDirective {
+  name: string;
+  description?: string;
+  args?: any[];
+  locations?: string[];
+  onOperation?: boolean;
+  onFragment?: boolean;
+  onField?: boolean;
+}
+
 const schemaCompressor = (schema: any, options: CompressionOptions = {}) => {
   const {
     removeDescriptions = false,
@@ -158,21 +168,82 @@ const schemaCompressor = (schema: any, options: CompressionOptions = {}) => {
     return compressed;
   };
 
+  // Helper function to compress a directive
+  const compressDirective = (directive: GraphQLDirective): any => {
+    if (!directive) return null;
+
+    const compressed: any = {
+      name: directive.name,
+    };
+
+    // Handle description if needed
+    if (!removeDescriptions && directive.description) {
+      compressed.description = directive.description;
+    }
+
+    // Handle arguments if they exist and aren't empty
+    if (Array.isArray(directive.args) && directive.args.length > 0) {
+      compressed.args = directive.args.map((arg: any) => ({
+        name: arg.name,
+        type: normalizeTypeReference(arg.type),
+        ...(arg.defaultValue && { default: arg.defaultValue }),
+      }));
+    }
+
+    // Handle locations if they exist and aren't empty
+    if (Array.isArray(directive.locations) && directive.locations.length > 0) {
+      compressed.locations = directive.locations;
+    }
+
+    return compressed;
+  };
+
+  // Ensure we have a valid schema with __schema property
+  if (!schema.__schema) {
+    throw new Error("Invalid schema: missing __schema property");
+  }
+
+  const schemaData = schema.__schema;
+
   // Process all types in the schema
-  const compressedTypes = Object.entries(schema.types || {}).reduce(
-    (acc: any, [typeName, typeValue]: [string, any]) => {
+  const compressedTypes = Object.entries(schemaData.types || {}).reduce(
+    (acc: any, [_, typeValue]: [string, any]) => {
       const compressed = compressType(typeValue);
       if (compressed) {
-        acc[typeName] = compressed;
+        acc[compressed.name] = compressed;
       }
       return acc;
     },
     {},
   );
 
-  return {
+  // Build the compressed schema structure
+  const compressedSchema = {
+    // Include root operation types if they exist
+    ...(schemaData.queryType && {
+      queryType: schemaData.queryType.name,
+    }),
+    ...(schemaData.mutationType && {
+      mutationType: schemaData.mutationType.name,
+    }),
+    ...(schemaData.subscriptionType && {
+      subscriptionType: schemaData.subscriptionType.name,
+    }),
+    // Include compressed types
     types: compressedTypes,
   };
+
+  // Include directives if they exist
+  if (
+    Array.isArray(schemaData.directives) &&
+    schemaData.directives.length > 0
+  ) {
+    compressedSchema.directives = schemaData.directives
+      .map(compressDirective)
+      .filter(Boolean);
+  }
+
+  return compressedSchema;
 };
 
 export default schemaCompressor;
