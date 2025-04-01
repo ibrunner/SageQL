@@ -14,7 +14,7 @@ import { RESPONSE_FORMATTER_PROMPT } from "../agents/prompts/response-formatter.
 import { EXPLORE_PROMPT } from "./prompts/explore.js";
 import { logger } from "../lib/logger.js";
 import { getMessageString } from "../lib/get-message-string.js";
-
+import schemaCompressor from "../lib/graphql/schema-compressor/schema-compressor.js";
 config();
 
 function parseArgs() {
@@ -40,12 +40,20 @@ async function main() {
 
     // Load the schema
     logger.info("\n=== Loading Schema ===");
-    const schemaJson = loadLatestSchema();
-    logger.info("Schema JSON loaded successfully");
+    const rawSchema = loadLatestSchema();
+    const schemaJson = JSON.parse(rawSchema);
+    logger.info("Schema loaded successfully");
+
+    // Create the compressed schema
+    logger.info("\n=== Compressing Schema ===");
+    const compressedSchema = await schemaCompressor(schemaJson);
+    logger.info("Schema compressed successfully");
 
     // Create the query graph
     logger.info("\n=== Creating Query Graph ===");
-    const graph = await createCompressedQueryGraph(llmEnv.GRAPHQL_API_URL);
+    const graph = await createCompressedQueryGraph(llmEnv.GRAPHQL_API_URL, {
+      __schema: schemaJson.__schema,
+    });
     logger.info("Query graph created successfully");
 
     const explorationPrompt = ChatPromptTemplate.fromMessages([
@@ -74,6 +82,7 @@ async function main() {
         validationErrors: [],
         executionResult: null,
         retryCount: 0,
+        schemaContext: null,
       };
 
       // Run the query graph

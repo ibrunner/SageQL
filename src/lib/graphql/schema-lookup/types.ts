@@ -85,7 +85,12 @@ export interface GraphQLEnumValue {
 export interface GraphQLSchema {
   __schema: {
     types: GraphQLType[];
-    queryType: { name: string };
+    queryType?: {
+      name?: string;
+      __typename?: string;
+      kind?: string;
+      description?: string | null;
+    };
     mutationType?: any;
     subscriptionType?: any;
     directives?: any[];
@@ -187,15 +192,26 @@ export const graphQLTypeSchema: z.ZodType<GraphQLType> = z.lazy(
   () => baseGraphQLTypeSchema as z.ZodType<GraphQLType>,
 );
 
-export const graphQLSchemaSchema = z.object({
-  __schema: z.object({
-    types: z.array(graphQLTypeSchema),
-    queryType: z.object({ name: z.string() }),
-    mutationType: z.any().optional(),
-    subscriptionType: z.any().optional(),
-    directives: z.array(z.any()).optional(),
-  }),
-});
+export const graphQLSchemaSchema = z
+  .object({
+    __schema: z
+      .object({
+        types: z.array(graphQLTypeSchema),
+        queryType: z
+          .object({
+            name: z.string().optional(),
+            __typename: z.string().optional(),
+            kind: z.string().optional(),
+            description: z.string().optional().nullable(),
+          })
+          .optional(),
+        mutationType: z.any().optional().nullable(),
+        subscriptionType: z.any().optional().nullable(),
+        directives: z.array(z.any()).optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough();
 
 export interface MergedLookupResponse {
   types: Record<string, TypeLookupResponse>;
