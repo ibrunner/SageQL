@@ -2,7 +2,7 @@ import { StateGraph, END, START } from "@langchain/langgraph";
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
 import { generateQuery } from "../agents/query-builder.js";
-import { createGraphQLExecutorTool } from "../tools/graphqlExecutor.js";
+import { createGraphQLExecutorTool } from "../tools/graphql-executor.js";
 import { queryValidatorTool } from "../lib/graphql/query-validation-output-parser.js";
 import { QueryValidationOutputParser } from "../lib/graphql/query-validation-output-parser.js";
 import { VALIDATION_RETRY_PROMPT } from "../agents/prompts/retry-validation.js";
