@@ -336,6 +336,7 @@ The simplified approach focuses on three key components:
 
 7. **Core Type Extraction**
 
+   - See `simplified-core-schema-creation.md`
    - Identify essential types needed for most queries
    - Create a "core schema" with just these types
 
