@@ -15,6 +15,7 @@
     "preview": "tsx src/scripts/preview.ts",
     "query": "tsx src/scripts/query.ts",
     "explore": "tsx src/scripts/explore.ts",
+    "explore-compressed": "tsx src/scripts/explore-compressed-schema.ts",
     "test": "jest --config jest.config.cjs",
     "test:watch": "jest --config jest.config.cjs --watch",
     "test:coverage": "jest --config jest.config.cjs --coverage"
