@@ -82,22 +82,154 @@ The simplified approach focuses on three key components:
 
 ### Compression Techniques
 
-1. **Description Removal**
+1. **Description Removal (Optional)**
 
-   - Remove all type and field descriptions (major space saving)
-   - Compress enum value descriptions
+   - Make description removal configurable to preserve schema intent
+   - When enabled, remove all type and field descriptions
+   - When disabled, retain descriptions to help LLMs understand schema intent
+
+   Configuration option:
+
+   ```json
+   {
+     "compression": {
+       "removeDescriptions": false, // Set to true to remove descriptions
+       "preserveEssentialDescriptions": true // Keep core type descriptions even when removing others
+     }
+   }
+   ```
+
+2. **Deprecation Pruning**
+
+   - Remove deprecated fields
+   - Store mapping of removed fields
+
+3. **Empty/Null Field Pruning**
+
+   - Remove fields with null values: `"inputFields": null`
+   - Remove empty arrays: `"args": []`, `"interfaces": []`
+   - Remove default boolean values: `"isDeprecated": false`
+   - Remove redundant or predictable type information: `"__typename": "__Field"`
 
    Before:
 
    ```json
    {
-     "name": "Repository",
-     "description": "A repository contains the content for a project.",
-     "fields": [
+     "__typename": "__Field",
+     "name": "id",
+     "description": "The id of the character.",
+     "args": [],
+     "type": {
+       "__typename": "__Type",
+       "kind": "SCALAR",
+       "name": "ID",
+       "ofType": null
+     },
+     "isDeprecated": false,
+     "deprecationReason": null
+   }
+   ```
+
+   After:
+
+   ```json
+   {
+     "name": "id",
+     "description": "The id of the character.",
+     "type": "ID"
+   }
+   ```
+
+4. **Type Reference Normalization**
+
+   - Convert complex nested type references into simplified string notation
+   - Use GraphQL SDL-style type references (e.g., `"[Episode]!"` instead of nested objects)
+   - Create a mapping to restore full type information when needed
+
+   Before:
+
+   ```json
+   {
+     "__typename": "__Field",
+     "name": "episode",
+     "description": "Episodes in which this character appeared.",
+     "type": {
+       "__typename": "__Type",
+       "kind": "NON_NULL",
+       "name": null,
+       "ofType": {
+         "__typename": "__Type",
+         "kind": "LIST",
+         "name": null,
+         "ofType": {
+           "__typename": "__Type",
+           "kind": "OBJECT",
+           "name": "Episode",
+           "ofType": null
+         }
+       }
+     }
+   }
+   ```
+
+   After:
+
+   ```json
+   {
+     "name": "episode",
+     "description": "Episodes in which this character appeared.",
+     "type": "[Episode]!"
+   }
+   ```
+
+   Type Reference Lookup:
+
+   ```json
+   // Request
+   {
+     "lookup": "typeStructure",
+     "typeRef": "[Episode]!"
+   }
+
+   // Response
+   {
+     "kind": "NON_NULL",
+     "ofType": {
+       "kind": "LIST",
+       "ofType": {
+         "kind": "OBJECT",
+         "name": "Episode"
+       }
+     }
+   }
+   ```
+
+5. **Directives Handling**
+
+   - Compress directive definitions
+   - Store only actively used directives
+   - Simplify directive locations and arguments
+
+   Before:
+
+   ```json
+   {
+     "__typename": "__Directive",
+     "name": "deprecated",
+     "description": "Marks an element of a GraphQL schema as no longer supported.",
+     "locations": ["FIELD_DEFINITION", "ENUM_VALUE"],
+     "args": [
        {
-         "name": "id",
-         "description": "The unique identifier of this repository.",
-         "type": "ID!"
+         "__typename": "__InputValue",
+         "name": "reason",
+         "description": "Explains why this element was deprecated, usually also including a suggestion for how to access supported similar data. Formatted using the Markdown syntax.",
+         "type": {
+           "__typename": "__Type",
+           "kind": "SCALAR",
+           "name": "String",
+           "ofType": null
+         },
+         "defaultValue": "\"No longer supported\""
        }
      ]
    }
@@ -107,27 +239,107 @@ The simplified approach focuses on three key components:
 
    ```json
    {
-     "name": "Repository",
-     "fields": [
+     "name": "deprecated",
+     "locations": ["FIELD_DEFINITION", "ENUM_VALUE"],
+     "args": [
        {
-         "name": "id",
-         "type": "ID!"
+         "name": "reason",
+         "type": "String",
+         "default": "\"No longer supported\""
        }
      ]
    }
    ```
 
-2. **Deprecation Pruning**
+6. **Common Pattern Recognition**
 
-   - Remove deprecated fields
-   - Store mapping of removed fields
+   - Identify and compress repetitive structural patterns
+   - Predefine patterns for connection types, edge types, pagination, etc.
+   - Apply pattern compression deterministically
 
-3. **Core Type Extraction**
+   Before (Connection Pattern):
+
+   ```json
+   {
+     "Characters": {
+       "kind": "OBJECT",
+       "fields": [
+         {
+           "name": "info",
+           "type": {
+             "kind": "OBJECT",
+             "name": "Info"
+           }
+         },
+         {
+           "name": "results",
+           "type": {
+             "kind": "LIST",
+             "ofType": {
+               "kind": "OBJECT",
+               "name": "Character"
+             }
+           }
+         }
+       ]
+     },
+     "Locations": {
+       "kind": "OBJECT",
+       "fields": [
+         {
+           "name": "info",
+           "type": {
+             "kind": "OBJECT",
+             "name": "Info"
+           }
+         },
+         {
+           "name": "results",
+           "type": {
+             "kind": "LIST",
+             "ofType": {
+               "kind": "OBJECT",
+               "name": "Location"
+             }
+           }
+         }
+       ]
+     }
+   }
+   ```
+
+   After (With Pattern Recognition):
+
+   ```json
+   {
+     "_patterns": {
+       "connection": {
+         "fields": [
+           { "name": "info", "type": "Info" },
+           { "name": "results", "type": "[{item}]" }
+         ]
+       }
+     },
+     "Characters": {
+       "kind": "OBJECT",
+       "_patternRef": {
+         "name": "connection",
+         "params": { "item": "Character" }
+       }
+     },
+     "Locations": {
+       "kind": "OBJECT",
+       "_patternRef": { "name": "connection", "params": { "item": "Location" } }
+     }
+   }
+   ```
+
+7. **Core Type Extraction**
 
    - Identify essential types needed for most queries
    - Create a "core schema" with just these types
 
-4. **Simple Type Grouping**
+8. **Simple Type Grouping**
 
    - Group related types based on name prefixes or references
    - Create simple domain mappings
@@ -222,6 +434,63 @@ The simplified approach focuses on three key components:
 }
 ```
 
+**Text-based Search:**
+
+```json
+// Request
+{
+  "lookup": "search",
+  "query": "character status",
+  "limit": 5
+}
+
+// Response
+{
+  "results": [
+    {
+      "path": "Character.status",
+      "type": "String",
+      "description": "The status of the character ('Alive', 'Dead' or 'unknown').",
+      "relevance": 0.95
+    },
+    {
+      "path": "FilterCharacter.status",
+      "type": "String",
+      "description": "Filter by character status",
+      "relevance": 0.82
+    },
+    {
+      "path": "Character",
+      "kind": "OBJECT",
+      "description": "A character from the Rick and Morty universe",
+      "relevance": 0.75
+    }
+  ]
+}
+```
+
+**Pattern Lookup:**
+
+```json
+// Request
+{
+  "lookup": "pattern",
+  "patternName": "connection",
+  "params": {
+    "item": "Character"
+  }
+}
+
+// Response
+{
+  "kind": "OBJECT",
+  "fields": [
+    {"name": "info", "type": "Info"},
+    {"name": "results", "type": "[Character]"}
+  ]
+}
+```
+
 ### Testing Plan
 
 - Benchmark lookup performance for different schema sizes
@@ -287,7 +556,7 @@ The simplified approach focuses on three key components:
 - Verify query functionality is preserved
 - Measure performance impact of lookups
 
-## Implementation Timeline
+## Implementation Roadmap
 
 ### Phase 1: Schema Representation & Parsing
 
@@ -297,10 +566,15 @@ The simplified approach focuses on three key components:
 
 ### Phase 2: Basic Compression Implementation
 
-- Implement description removal
+- Implement configurable description removal
 - Add deprecation pruning
+- Add empty/null field pruning
+- Implement type reference normalization
+- Handle directive compression
+- Add common pattern recognition
 - Create core type extraction
 - Develop simple domain grouping
+- Build text-based search capabilities
 
 ### Phase 3: Lookup System & Testing
 
@@ -341,56 +615,102 @@ The simplified approach focuses on three key components:
    - Can add optimizations incrementally
    - Modular design
 
-## Example Schema Compression
+## Example of Realistic Schema Compression
 
-### Original Schema Snippet (GitHub API)
+### Original Schema Snippet (Real-world example)
 
-```graphql
-type Repository {
-  """
-  The name of the repository.
-  """
-  name: String!
-
-  """
-  The User owner of the repository.
-  """
-  owner: RepositoryOwner!
-
-  """
-  The HTTP URL for this repository
-  """
-  url: URI!
-
-  """
-  Returns a count of how many stargazers there are on this object
-  """
-  stargazerCount: Int!
-
-  """
-  A list of users who have starred this starrable.
-  """
-  stargazers(
-    """
-    Returns the elements in the list that come after the specified cursor.
-    """
-    after: String
-
-    """
-    Returns the elements in the list that come before the specified cursor.
-    """
-    before: String
-
-    """
-    Returns the first _n_ elements from the list.
-    """
-    first: Int
-
-    """
-    Returns the last _n_ elements from the list.
-    """
-    last: Int
-  ): StargazerConnection!
+```json
+{
+  "__typename": "__Type",
+  "kind": "OBJECT",
+  "name": "Character",
+  "description": "",
+  "fields": [
+    {
+      "__typename": "__Field",
+      "name": "id",
+      "description": "The id of the character.",
+      "args": [],
+      "type": {
+        "__typename": "__Type",
+        "kind": "SCALAR",
+        "name": "ID",
+        "ofType": null
+      },
+      "isDeprecated": false,
+      "deprecationReason": null
+    },
+    {
+      "__typename": "__Field",
+      "name": "name",
+      "description": "The name of the character.",
+      "args": [],
+      "type": {
+        "__typename": "__Type",
+        "kind": "SCALAR",
+        "name": "String",
+        "ofType": null
+      },
+      "isDeprecated": false,
+      "deprecationReason": null
+    },
+    {
+      "__typename": "__Field",
+      "name": "status",
+      "description": "The status of the character ('Alive', 'Dead' or 'unknown').",
+      "args": [],
+      "type": {
+        "__typename": "__Type",
+        "kind": "SCALAR",
+        "name": "String",
+        "ofType": null
+      },
+      "isDeprecated": false,
+      "deprecationReason": null
+    },
+    {
+      "__typename": "__Field",
+      "name": "species",
+      "description": "The species of the character.",
+      "args": [],
+      "type": {
+        "__typename": "__Type",
+        "kind": "SCALAR",
+        "name": "String",
+        "ofType": null
+      },
+      "isDeprecated": false,
+      "deprecationReason": null
+    },
+    {
+      "__typename": "__Field",
+      "name": "episode",
+      "description": "Episodes in which this character appeared.",
+      "args": [],
+      "type": {
+        "__typename": "__Type",
+        "kind": "NON_NULL",
+        "name": null,
+        "ofType": {
+          "__typename": "__Type",
+          "kind": "LIST",
+          "name": null,
+          "ofType": {
+            "__typename": "__Type",
+            "kind": "OBJECT",
+            "name": "Episode",
+            "ofType": null
+          }
+        }
+      },
+      "isDeprecated": false,
+      "deprecationReason": null
+    }
+  ],
+  "inputFields": null,
+  "interfaces": [],
+  "enumValues": null,
+  "possibleTypes": null
 }
 ```
 
@@ -398,19 +718,35 @@ type Repository {
 
 ```json
 {
-  "types": {
-    "Repository": {
-      "kind": "OBJECT",
-      "fields": [
-        { "name": "name", "type": "String!" },
-        { "name": "owner", "type": "RepositoryOwner!" },
-        { "name": "url", "type": "URI!" }
-      ]
+  "kind": "OBJECT",
+  "name": "Character",
+  "fields": [
+    {
+      "name": "id",
+      "description": "The id of the character.",
+      "type": "ID"
+    },
+    {
+      "name": "name",
+      "description": "The name of the character.",
+      "type": "String"
+    },
+    {
+      "name": "status",
+      "description": "The status of the character ('Alive', 'Dead' or 'unknown').",
+      "type": "String"
+    },
+    {
+      "name": "species",
+      "description": "The species of the character.",
+      "type": "String"
+    },
+    {
+      "name": "episode",
+      "description": "Episodes in which this character appeared.",
+      "type": "[Episode]!"
     }
-  },
-  "expandable": {
-    "Repository": ["stargazerCount", "stargazers"]
-  }
+  ]
 }
 ```
 
