@@ -184,11 +184,7 @@ const baseGraphQLTypeSchema = z.object({
 });
 
 export const graphQLTypeSchema: z.ZodType<GraphQLType> = z.lazy(
-  () =>
-    baseGraphQLTypeSchema.transform((type) => ({
-      ...type,
-      name: type.name || "__unnamed",
-    })) as z.ZodType<GraphQLType>,
+  () => baseGraphQLTypeSchema as z.ZodType<GraphQLType>,
 );
 
 export const graphQLSchemaSchema = z.object({

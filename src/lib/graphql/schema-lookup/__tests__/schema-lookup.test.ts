@@ -29,21 +29,23 @@ describe("Schema Lookup", () => {
     });
   });
 
-  // describe("Type Lookup", () => {
-  //   it("should look up a type by ID", () => {
-  //     const result = schemaLookup(testSchema, {
-  //       lookup: "type",
-  //       id: "Character",
-  //     });
-  //     expect(result).toEqual(testSchema.types.Character);
-  //   });
+  describe("Type Lookup", () => {
+    it("should look up a type by ID", () => {
+      const result = schemaLookup(testSchema, {
+        lookup: "type",
+        id: "Character",
+      });
+      expect(result).toEqual(
+        testSchema.__schema.types.find((t) => t.name === "Character"),
+      );
+    });
 
-  //   it("should throw error for non-existent type", () => {
-  //     expect(() =>
-  //       schemaLookup(testSchema, { lookup: "type", id: "NonExistent" }),
-  //     ).toThrow("Type not found: NonExistent");
-  //   });
-  // });
+    it("should throw error for non-existent type", () => {
+      expect(() =>
+        schemaLookup(testSchema, { lookup: "type", id: "NonExistent" }),
+      ).toThrow("Type not found: NonExistent");
+    });
+  });
 
   // describe("Field Lookup", () => {
   //   it("should look up a field by type and field ID", () => {
@@ -52,12 +54,13 @@ describe("Schema Lookup", () => {
   //       typeId: "Character",
   //       fieldId: "status",
   //     });
-  //     expect(result).toEqual({
-  //       name: "status",
-  //       type: "String",
-  //       description:
-  //         "The status of the character ('Alive', 'Dead' or 'unknown').",
-  //     });
+  //     const characterType = testSchema.__schema.types.find(
+  //       (t) => t.name === "Character",
+  //     );
+  //     const statusField = characterType?.fields?.find(
+  //       (f) => f.name === "status",
+  //     );
+  //     expect(result).toEqual(statusField);
   //   });
 
   //   it("should throw error for non-existent field", () => {
@@ -89,13 +92,24 @@ describe("Schema Lookup", () => {
 
   //   it("should return empty relationships for scalar types", () => {
   //     const schemaWithScalar = {
-  //       types: {
-  //         ...testSchema.types,
-  //         DateTime: {
-  //           kind: "SCALAR",
-  //           name: "DateTime",
-  //           description: "ISO-8601 encoded UTC date string",
-  //         },
+  //       __schema: {
+  //         types: [
+  //           ...testSchema.__schema.types,
+  //           {
+  //             __typename: "__Type",
+  //             kind: "SCALAR",
+  //             name: "DateTime",
+  //             description: "ISO-8601 encoded UTC date string",
+  //             fields: null,
+  //             interfaces: [],
+  //             enumValues: null,
+  //             possibleTypes: null,
+  //           },
+  //         ],
+  //         queryType: testSchema.__schema.queryType,
+  //         mutationType: null,
+  //         subscriptionType: null,
+  //         directives: [],
   //       },
   //     };
   //     const result = schemaLookup(schemaWithScalar, {
