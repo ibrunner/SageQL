@@ -1,0 +1,30 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Schema Compressor Snapshots should match snapshot 1`] = `
+{
+  "types": {
+    "Character": {
+      "description": "A character from the Rick and Morty universe",
+      "fields": [
+        {
+          "description": "The id of the character.",
+          "name": "id",
+          "type": "ID",
+        },
+        {
+          "description": "The name of the character.",
+          "name": "name",
+          "type": "String",
+        },
+        {
+          "description": "Episodes in which this character appeared.",
+          "name": "episode",
+          "type": "[Episode]!",
+        },
+      ],
+      "kind": "OBJECT",
+      "name": "Character",
+    },
+  },
+}
+`;
