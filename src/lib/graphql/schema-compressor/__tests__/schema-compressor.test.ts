@@ -66,89 +66,89 @@ describe("Schema Compressor", () => {
     });
   });
 
-  // describe("Step 2: Deprecation Pruning", () => {
-  //   it("should remove deprecated fields when removeDeprecated is true", () => {
-  //     const schema = { types: { User: mockDeprecatedFieldType } };
-  //     const compressed = schemaCompressor(schema, { removeDeprecated: true });
+  describe("Step 2: Deprecation Pruning", () => {
+    it("should remove deprecated fields when removeDeprecated is true", () => {
+      const schema = { types: { User: mockDeprecatedFieldType } };
+      const compressed = schemaCompressor(schema, { removeDeprecated: true });
 
-  //     const fields = compressed.types.User.fields;
-  //     expect(fields.length).toBe(1);
-  //     expect(fields[0].name).toBe("id");
-  //     expect(fields.find((f: any) => f.name === "username")).toBeUndefined();
-  //   });
+      const fields = compressed.types.User.fields;
+      expect(fields.length).toBe(1);
+      expect(fields[0].name).toBe("id");
+      expect(fields.find((f: any) => f.name === "username")).toBeUndefined();
+    });
 
-  //   it("should keep deprecated fields when removeDeprecated is false", () => {
-  //     const schema = { types: { User: mockDeprecatedFieldType } };
-  //     const compressed = schemaCompressor(schema, { removeDeprecated: false });
+    it("should keep deprecated fields when removeDeprecated is false", () => {
+      const schema = { types: { User: mockDeprecatedFieldType } };
+      const compressed = schemaCompressor(schema, { removeDeprecated: false });
 
-  //     const fields = compressed.types.User.fields;
-  //     expect(fields.length).toBe(2);
-  //     expect(fields.find((f: any) => f.name === "username")).toBeDefined();
-  //   });
-  // });
+      const fields = compressed.types.User.fields;
+      expect(fields.length).toBe(2);
+      expect(fields.find((f: any) => f.name === "username")).toBeDefined();
+    });
+  });
 
-  // describe("Step 3: Empty/Null Field Pruning", () => {
-  //   it("should remove empty arrays and null values", () => {
-  //     const schema = { types: { Character: mockCharacterType } };
-  //     const compressed = schemaCompressor(schema);
+  describe("Step 3: Empty/Null Field Pruning", () => {
+    it("should remove empty arrays and null values", () => {
+      const schema = { types: { Character: mockCharacterType } };
+      const compressed = schemaCompressor(schema);
 
-  //     expect(compressed.types.Character.inputFields).toBeUndefined();
-  //     expect(compressed.types.Character.interfaces).toBeUndefined();
-  //     expect(compressed.types.Character.enumValues).toBeUndefined();
-  //     expect(compressed.types.Character.possibleTypes).toBeUndefined();
-  //   });
+      expect(compressed.types.Character.inputFields).toBeUndefined();
+      expect(compressed.types.Character.interfaces).toBeUndefined();
+      expect(compressed.types.Character.enumValues).toBeUndefined();
+      expect(compressed.types.Character.possibleTypes).toBeUndefined();
+    });
 
-  //   it("should remove empty args arrays from fields", () => {
-  //     const schema = { types: { Character: mockCharacterType } };
-  //     const compressed = schemaCompressor(schema);
+    it("should remove empty args arrays from fields", () => {
+      const schema = { types: { Character: mockCharacterType } };
+      const compressed = schemaCompressor(schema);
 
-  //     compressed.types.Character.fields.forEach((field: any) => {
-  //       expect(field.args).toBeUndefined();
-  //     });
-  //   });
-  // });
+      compressed.types.Character.fields.forEach((field: any) => {
+        expect(field.args).toBeUndefined();
+      });
+    });
+  });
 
-  // describe("Step 4: Type Reference Normalization", () => {
-  //   it("should normalize complex nested type references into string notation", () => {
-  //     const schema = { types: { Character: mockCharacterType } };
-  //     const compressed = schemaCompressor(schema);
+  describe("Step 4: Type Reference Normalization", () => {
+    it("should normalize complex nested type references into string notation", () => {
+      const schema = { types: { Character: mockCharacterType } };
+      const compressed = schemaCompressor(schema);
 
-  //     const episodeField = compressed.types.Character.fields.find(
-  //       (f: any) => f.name === "episode",
-  //     );
-  //     expect(episodeField.type).toBe("[Episode]!");
-  //   });
+      const episodeField = compressed.types.Character.fields.find(
+        (f: any) => f.name === "episode",
+      );
+      expect(episodeField.type).toBe("[Episode]!");
+    });
 
-  //   it("should handle simple scalar types", () => {
-  //     const schema = { types: { Character: mockCharacterType } };
-  //     const compressed = schemaCompressor(schema);
+    it("should handle simple scalar types", () => {
+      const schema = { types: { Character: mockCharacterType } };
+      const compressed = schemaCompressor(schema);
 
-  //     const idField = compressed.types.Character.fields.find(
-  //       (f: any) => f.name === "id",
-  //     );
-  //     expect(idField.type).toBe("ID");
-  //   });
-  // });
+      const idField = compressed.types.Character.fields.find(
+        (f: any) => f.name === "id",
+      );
+      expect(idField.type).toBe("ID");
+    });
+  });
 
-  // describe("Step 5: Directives Handling", () => {
-  //   it("should compress directive definitions", () => {
-  //     const schema = { types: { FieldWithDirectives: mockDirectiveType } };
-  //     const compressed = schemaCompressor(schema);
+  describe("Step 5: Directives Handling", () => {
+    it("should compress directive definitions", () => {
+      const schema = { types: { FieldWithDirectives: mockDirectiveType } };
+      const compressed = schemaCompressor(schema);
 
-  //     const statusField = compressed.types.FieldWithDirectives.fields[0];
-  //     expect(statusField.directives).toBeDefined();
-  //     expect(statusField.directives[0]).toEqual({
-  //       name: "deprecated",
-  //       args: [
-  //         {
-  //           name: "reason",
-  //           type: "String",
-  //           default: '"No longer supported"',
-  //         },
-  //       ],
-  //     });
-  //   });
-  // });
+      const statusField = compressed.types.FieldWithDirectives.fields[0];
+      expect(statusField.directives).toBeDefined();
+      expect(statusField.directives[0]).toEqual({
+        name: "deprecated",
+        args: [
+          {
+            name: "reason",
+            type: "String",
+            default: '"No longer supported"',
+          },
+        ],
+      });
+    });
+  });
 
   // describe("Complete Schema Compression", () => {
   //   it("should produce a correctly compressed schema", () => {

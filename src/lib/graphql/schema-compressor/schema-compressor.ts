@@ -108,6 +108,23 @@ const schemaCompressor = (schema: any, options: CompressionOptions = {}) => {
             }));
           }
 
+          // Handle field directives
+          if (field.directives?.length > 0) {
+            compressedField.directives = field.directives.map(
+              (directive: any) => ({
+                name: directive.name,
+                args:
+                  directive.args?.length > 0
+                    ? directive.args.map((arg: any) => ({
+                        name: arg.name,
+                        type: normalizeTypeReference(arg.type),
+                        ...(arg.defaultValue && { default: arg.defaultValue }),
+                      }))
+                    : undefined,
+              }),
+            );
+          }
+
           return compressedField;
         })
         .filter(Boolean); // Remove null entries
