@@ -1,16 +1,16 @@
 import { config } from "dotenv";
-import { createQueryGraph, QueryGraphState } from "../workflows/queryGraph.js";
-import { loadLatestSchema } from "../lib/graphql/loadLatestSchema.js";
+import { createQueryGraph, QueryGraphState } from "../workflows/query-graph.js";
+import { loadLatestSchema } from "../lib/graphql/load-latest-schema.js";
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
 } from "@langchain/core/prompts";
 import { HumanMessage } from "@langchain/core/messages";
-import { llmModel, llmEnv } from "../lib/llmClient.js";
-import { RESPONSE_FORMATTER_PROMPT } from "../agents/prompts/responseFormatter.js";
+import { llmModel, llmEnv } from "../lib/llm-client.js";
+import { RESPONSE_FORMATTER_PROMPT } from "../agents/prompts/response-formatter.js";
 import { EXPLORE_PROMPT } from "./prompts/explore.js";
 import { logger } from "../lib/logger.js";
-import { getMessageString } from "../lib/getMessageString.js";
+import { getMessageString } from "../lib/get-message-string.js";
 
 config();
 

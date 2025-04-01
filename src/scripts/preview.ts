@@ -5,7 +5,7 @@ import {
   handlePromptSelection,
   logChatOutput,
 } from "./chat.js";
-import { loadLatestSchema } from "../lib/graphql/loadLatestSchema.js";
+import { loadLatestSchema } from "../lib/graphql/load-latest-schema.js";
 import { logger } from "@/lib/logger.js";
 /**
  * Main execution function that:

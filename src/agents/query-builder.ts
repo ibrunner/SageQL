@@ -5,8 +5,8 @@ import {
 } from "@langchain/core/prompts";
 import { BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { GraphQLSchema, parse, validate, buildClientSchema } from "graphql";
-import { llmModel } from "../lib/llmClient.js";
-import { QUERY_BUILDER_PROMPT_TEMPLATE } from "./prompts/queryBuilder.js";
+import { llmModel } from "../lib/llm-client.js";
+import { QUERY_BUILDER_PROMPT_TEMPLATE } from "./prompts/query-builder.js";
 import { logger } from "../lib/logger.js";
 
 export interface QueryBuilderState {

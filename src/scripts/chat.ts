@@ -1,11 +1,11 @@
 import { config } from "dotenv";
-import { loadLatestSchema } from "../lib/graphql/loadLatestSchema.js";
+import { loadLatestSchema } from "../lib/graphql/load-latest-schema.js";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import { schemaUnderstandingPrompts } from "./prompts/schemaUnderstanding.js";
 import { queryGenerationPrompts } from "./prompts/queryGeneration.js";
-import { QUERY_BUILDER_PROMPT } from "../agents/prompts/queryBuilder.js";
-import { llmModel, llmEnv } from "../lib/llmClient.js";
+import { QUERY_BUILDER_PROMPT } from "../agents/prompts/query-builder.js";
+import { llmModel, llmEnv } from "../lib/llm-client.js";
 import { logger } from "@/lib/logger.js";
 
 // Load environment variables

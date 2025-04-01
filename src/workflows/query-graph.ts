@@ -1,15 +1,15 @@
 import { StateGraph, END, START } from "@langchain/langgraph";
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
-import { generateQuery } from "../agents/queryBuilder.js";
+import { generateQuery } from "../agents/query-builder.js";
 import { createGraphQLExecutorTool } from "../tools/graphqlExecutor.js";
-import { queryValidatorTool } from "../lib/graphql/queryValidationOutputParser.js";
-import { QueryValidationOutputParser } from "../lib/graphql/queryValidationOutputParser.js";
-import { VALIDATION_RETRY_PROMPT } from "../agents/prompts/retryValidation.js";
-import { EXECUTION_RETRY_PROMPT } from "../agents/prompts/retryExecution.js";
-import { formatValidationErrors } from "../lib/graphql/errorFormatting.js";
+import { queryValidatorTool } from "../lib/graphql/query-validation-output-parser.js";
+import { QueryValidationOutputParser } from "../lib/graphql/query-validation-output-parser.js";
+import { VALIDATION_RETRY_PROMPT } from "../agents/prompts/retry-validation.js";
+import { EXECUTION_RETRY_PROMPT } from "../agents/prompts/retry-execution.js";
+import { formatValidationErrors } from "../lib/graphql/error-formatting.js";
 import { logger } from "../lib/logger.js";
-import { getMessageString } from "../lib/getMessageString.js";
+import { getMessageString } from "../lib/get-message-string.js";
 
 const MAX_RETRIES = 3;
 // Define state schema with reducers
