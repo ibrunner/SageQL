@@ -105,6 +105,28 @@ yarn lint      # Linting
 yarn format    # Code formatting
 ```
 
+### Running Tests
+
+The project uses Jest for testing. You can run tests using the following commands:
+
+```bash
+yarn test           # Run all tests
+yarn test:watch    # Run tests in watch mode
+yarn test:coverage # Run tests with coverage report
+
+# Run tests for a specific file
+yarn test path/to/your-test-file.test.ts
+
+# Run tests matching a specific pattern
+yarn test -t "test pattern"
+```
+
+Example of running tests for a specific component:
+
+```bash
+yarn test src/agents/query-builder/__tests__/query-builder.test.ts
+```
+
 ## Architecture
 
 The system uses a LangGraph-based architecture with specialized agents:
