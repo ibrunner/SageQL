@@ -47,32 +47,32 @@ describe("Schema Lookup", () => {
     });
   });
 
-  // describe("Field Lookup", () => {
-  //   it("should look up a field by type and field ID", () => {
-  //     const result = schemaLookup(testSchema, {
-  //       lookup: "field",
-  //       typeId: "Character",
-  //       fieldId: "status",
-  //     });
-  //     const characterType = testSchema.__schema.types.find(
-  //       (t) => t.name === "Character",
-  //     );
-  //     const statusField = characterType?.fields?.find(
-  //       (f) => f.name === "status",
-  //     );
-  //     expect(result).toEqual(statusField);
-  //   });
+  describe("Field Lookup", () => {
+    it("should look up a field by type and field ID", () => {
+      const result = schemaLookup(testSchema, {
+        lookup: "field",
+        typeId: "Character",
+        fieldId: "status",
+      });
+      const characterType = testSchema.__schema.types.find(
+        (t) => t.name === "Character",
+      );
+      const statusField = characterType?.fields?.find(
+        (f) => f.name === "status",
+      );
+      expect(result).toEqual(statusField);
+    });
 
-  //   it("should throw error for non-existent field", () => {
-  //     expect(() =>
-  //       schemaLookup(testSchema, {
-  //         lookup: "field",
-  //         typeId: "Character",
-  //         fieldId: "nonExistent",
-  //       }),
-  //     ).toThrow("Field not found: nonExistent on type Character");
-  //   });
-  // });
+    it("should throw error for non-existent field", () => {
+      expect(() =>
+        schemaLookup(testSchema, {
+          lookup: "field",
+          typeId: "Character",
+          fieldId: "nonExistent",
+        }),
+      ).toThrow("Field not found: nonExistent on type Character");
+    });
+  });
 
   // describe("Relationships Lookup", () => {
   //   it("should find outgoing and incoming relationships", () => {
