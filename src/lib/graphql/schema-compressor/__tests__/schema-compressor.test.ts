@@ -5,30 +5,66 @@ describe("Schema Compressor", () => {
   describe("Snapshots", () => {
     it("should match snapshot", () => {
       const schema = { types: { Character: mockCharacterType } };
-      const compressed = schemaCompressor(schema, { removeDescriptions: true });
+      const compressed = schemaCompressor(schema);
       expect(compressed).toMatchSnapshot();
     });
   });
 
-  // describe("Step 1: Description Removal", () => {
-  //   it("should remove descriptions when removeDescriptions is true", () => {
-  //     const schema = { types: { Character: mockCharacterType } };
-  //     const compressed = schemaCompressor(schema, { removeDescriptions: true });
+  describe("Step 1: Description Removal", () => {
+    it("should keep all descriptions by default", () => {
+      const schema = { types: { Character: mockCharacterType } };
+      const compressed = schemaCompressor(schema);
 
-  //     expect(compressed.types.Character.description).toBeUndefined();
-  //     expect(compressed.types.Character.fields[0].description).toBeUndefined();
-  //   });
+      expect(compressed.types.Character.description).toBe(
+        "A character from the Rick and Morty universe",
+      );
+      expect(compressed.types.Character.fields[0].description).toBe(
+        "The id of the character.",
+      );
+    });
 
-  //   it("should preserve essential descriptions when preserveEssentialDescriptions is true", () => {
-  //     const schema = { types: { Character: mockCharacterType } };
-  //     const compressed = schemaCompressor(schema, {
-  //       removeDescriptions: true,
-  //       preserveEssentialDescriptions: true,
-  //     });
+    it("should remove all descriptions when removeDescriptions is true and preserveEssentialDescriptions is false", () => {
+      const schema = { types: { Character: mockCharacterType } };
+      const compressed = schemaCompressor(schema, {
+        removeDescriptions: true,
+        preserveEssentialDescriptions: false,
+      });
 
-  //     expect(compressed.types.Character.description).toBeDefined();
-  //   });
-  // });
+      expect(compressed.types.Character.description).toBeUndefined();
+      expect(compressed.types.Character.fields[0].description).toBeUndefined();
+    });
+
+    it("should preserve only OBJECT descriptions when preserveEssentialDescriptions is true", () => {
+      const schema = { types: { Character: mockCharacterType } };
+      const compressed = schemaCompressor(schema, {
+        removeDescriptions: true,
+        preserveEssentialDescriptions: true,
+      });
+
+      // OBJECT type description should be preserved
+      expect(compressed.types.Character.description).toBe(
+        "A character from the Rick and Morty universe",
+      );
+      // Field descriptions should still be removed
+      expect(compressed.types.Character.fields[0].description).toBeUndefined();
+    });
+
+    it("should handle types without descriptions gracefully", () => {
+      const typeWithoutDescription = {
+        ...mockCharacterType,
+        description: undefined,
+        fields: mockCharacterType.fields.map((f) => ({
+          ...f,
+          description: undefined,
+        })),
+      };
+      const schema = { types: { Character: typeWithoutDescription } };
+      const compressed = schemaCompressor(schema);
+
+      expect(compressed.types.Character.description).toBeUndefined();
+      expect(compressed.types.Character.fields[0].description).toBeUndefined();
+    });
+  });
 
   // describe("Step 2: Deprecation Pruning", () => {
   //   it("should remove deprecated fields when removeDeprecated is true", () => {

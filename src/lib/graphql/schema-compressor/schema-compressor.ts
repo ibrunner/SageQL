@@ -49,14 +49,26 @@ const schemaCompressor = (schema: any, options: CompressionOptions = {}) => {
       name: type.name,
     };
 
-    // Step 1: Description Removal (Optional)
-    if (
-      !removeDescriptions ||
-      (preserveEssentialDescriptions && type.kind === "OBJECT")
-    ) {
-      if (type.description) {
-        compressed.description = type.description;
-      }
+    // Step 1: Description Handling
+    // Determine if this type should preserve its description based on configuration
+    const isObjectType = type.kind === "OBJECT";
+    const hasDescription = Boolean(type.description);
+
+    // If removeDescriptions is false, we keep all descriptions
+    const keepAllDescriptions = !removeDescriptions;
+
+    // If preserveEssentialDescriptions is true, we keep descriptions for OBJECT types
+    // even if removeDescriptions is true
+    const keepEssentialDescription =
+      preserveEssentialDescriptions && isObjectType;
+
+    // Final decision on whether to keep the description
+    const shouldKeepDescription =
+      keepAllDescriptions || keepEssentialDescription;
+
+    // Add description to compressed output if we should keep it and it exists
+    if (shouldKeepDescription && hasDescription) {
+      compressed.description = type.description;
     }
 
     // Step 2: Deprecation Pruning
@@ -78,11 +90,8 @@ const schemaCompressor = (schema: any, options: CompressionOptions = {}) => {
             name: field.name,
           };
 
-          // Handle field descriptions
-          if (
-            !removeDescriptions ||
-            (preserveEssentialDescriptions && field.description)
-          ) {
+          // Handle field descriptions - always remove if removeDescriptions is true
+          if (!removeDescriptions && field.description) {
             compressedField.description = field.description;
           }
 
