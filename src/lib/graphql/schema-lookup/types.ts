@@ -49,11 +49,11 @@ export interface GraphQLType {
   kind: string;
   name: string;
   description?: string;
-  fields?: GraphQLField[];
-  interfaces?: GraphQLType[];
-  enumValues?: GraphQLEnumValue[];
-  possibleTypes?: GraphQLType[];
-  ofType?: GraphQLType;
+  fields?: GraphQLField[] | null;
+  interfaces?: GraphQLType[] | null;
+  enumValues?: GraphQLEnumValue[] | null;
+  possibleTypes?: GraphQLType[] | null;
+  ofType?: GraphQLType | null;
 }
 
 export interface GraphQLField {
@@ -63,7 +63,7 @@ export interface GraphQLField {
   args?: GraphQLInputValue[];
   type: GraphQLType;
   isDeprecated?: boolean;
-  deprecationReason?: string | null;
+  deprecationReason?: any;
 }
 
 export interface GraphQLInputValue {
@@ -71,7 +71,7 @@ export interface GraphQLInputValue {
   name: string;
   description?: string;
   type: GraphQLType;
-  defaultValue?: string | null;
+  defaultValue?: any;
 }
 
 export interface GraphQLEnumValue {
@@ -79,15 +79,15 @@ export interface GraphQLEnumValue {
   name: string;
   description?: string;
   isDeprecated?: boolean;
-  deprecationReason?: string | null;
+  deprecationReason?: any;
 }
 
 export interface GraphQLSchema {
   __schema: {
     types: GraphQLType[];
     queryType: { name: string };
-    mutationType?: { name: string } | null;
-    subscriptionType?: { name: string } | null;
+    mutationType?: any;
+    subscriptionType?: any;
     directives?: any[];
   };
 }
@@ -135,7 +135,7 @@ export const graphQLInputValueSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   type: z.lazy(() => graphQLTypeSchema),
-  defaultValue: z.string().nullable().optional(),
+  defaultValue: z.any().optional(),
 });
 
 export const graphQLEnumValueSchema = z.object({
@@ -143,39 +143,60 @@ export const graphQLEnumValueSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   isDeprecated: z.boolean().optional(),
-  deprecationReason: z.string().nullable().optional(),
+  deprecationReason: z.any().optional(),
 });
 
 export const graphQLFieldSchema = z.object({
   __typename: z.string().optional(),
   name: z.string(),
   description: z.string().optional(),
-  args: z.array(graphQLInputValueSchema).optional(),
+  args: z.array(graphQLInputValueSchema).optional().default([]),
   type: z.lazy(() => graphQLTypeSchema),
   isDeprecated: z.boolean().optional(),
-  deprecationReason: z.string().nullable().optional(),
+  deprecationReason: z.any().optional(),
 });
 
-export const graphQLTypeSchema: z.ZodType<GraphQLType> = z.lazy(() =>
-  z.object({
-    __typename: z.string().optional(),
-    kind: z.string(),
-    name: z.string(),
-    description: z.string().optional(),
-    fields: z.array(graphQLFieldSchema).optional(),
-    interfaces: z.array(z.lazy(() => graphQLTypeSchema)).optional(),
-    enumValues: z.array(graphQLEnumValueSchema).optional(),
-    possibleTypes: z.array(z.lazy(() => graphQLTypeSchema)).optional(),
-    ofType: z.lazy(() => graphQLTypeSchema).optional(),
-  }),
+// Input type for schema validation
+interface GraphQLTypeInput extends Omit<GraphQLType, "name"> {
+  name: string | null;
+}
+
+// Base schema for GraphQL types
+const baseGraphQLTypeSchema = z.object({
+  __typename: z.string().optional(),
+  kind: z.string(),
+  name: z.union([z.string(), z.null()]),
+  description: z.string().optional(),
+  fields: z.array(graphQLFieldSchema).nullable().optional(),
+  interfaces: z
+    .array(z.lazy(() => graphQLTypeSchema))
+    .nullable()
+    .optional(),
+  enumValues: z.array(graphQLEnumValueSchema).nullable().optional(),
+  possibleTypes: z
+    .array(z.lazy(() => graphQLTypeSchema))
+    .nullable()
+    .optional(),
+  ofType: z
+    .lazy(() => graphQLTypeSchema)
+    .nullable()
+    .optional(),
+});
+
+export const graphQLTypeSchema: z.ZodType<GraphQLType> = z.lazy(
+  () =>
+    baseGraphQLTypeSchema.transform((type) => ({
+      ...type,
+      name: type.name || "__unnamed",
+    })) as z.ZodType<GraphQLType>,
 );
 
 export const graphQLSchemaSchema = z.object({
   __schema: z.object({
     types: z.array(graphQLTypeSchema),
     queryType: z.object({ name: z.string() }),
-    mutationType: z.object({ name: z.string() }).nullable().optional(),
-    subscriptionType: z.object({ name: z.string() }).nullable().optional(),
+    mutationType: z.any().optional(),
+    subscriptionType: z.any().optional(),
     directives: z.array(z.any()).optional(),
   }),
 });

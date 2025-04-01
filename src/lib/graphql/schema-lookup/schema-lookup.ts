@@ -45,7 +45,9 @@ const schemaLookup = (
   // Validate schema before use
   const validatedSchema = validateSchema(schema);
   const typeMap = new Map(
-    validatedSchema.__schema.types.map((t) => [t.name, t]),
+    validatedSchema.__schema.types
+      .filter((t): t is GraphQLType & { name: string } => t.name !== null)
+      .map((t) => [t.name, t]),
   );
 
   switch (request.lookup) {
