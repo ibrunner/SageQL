@@ -9,6 +9,8 @@ import {
   GraphQLSchema,
   GraphQLType,
   SearchResult,
+  LookupType,
+  MergedLookupResponse,
 } from "./types.js";
 
 /**
@@ -191,6 +193,92 @@ function searchSchema(
   return {
     results: results.sort((a, b) => b.relevance - a.relevance).slice(0, limit),
   };
+}
+
+export function schemaListLookup(
+  schema: unknown,
+  requests: LookupRequest[],
+): MergedLookupResponse {
+  const merged: MergedLookupResponse = {
+    types: {},
+    fields: {},
+    relationships: {},
+    searchResults: [],
+    metadata: {
+      requestOrder: [],
+      relatedTypes: new Set(),
+    },
+  };
+
+  // Validate schema once for all requests
+  const validatedSchema = validateSchema(schema);
+  const typeMap = new Map(
+    validatedSchema.__schema.types
+      .filter((t): t is GraphQLType & { name: string } => t.name !== null)
+      .map((t) => [t.name, t]),
+  );
+
+  for (const request of requests) {
+    switch (request.lookup) {
+      case "type":
+        const typeResult = lookupType(typeMap, request.id);
+        merged.types[request.id] = typeResult;
+        merged.metadata.requestOrder.push({
+          type: request.lookup,
+          id: request.id,
+        });
+        merged.metadata.relatedTypes.add(request.id);
+        break;
+      case "field":
+        const fieldResult = lookupField(
+          typeMap,
+          request.typeId,
+          request.fieldId,
+        );
+        const fieldKey = `${request.typeId}.${request.fieldId}`;
+        merged.fields[fieldKey] = fieldResult;
+        merged.metadata.requestOrder.push({
+          type: request.lookup,
+          id: fieldKey,
+        });
+        merged.metadata.relatedTypes.add(request.typeId);
+        const fieldType = getConcreteTypeName(fieldResult.type);
+        if (fieldType) merged.metadata.relatedTypes.add(fieldType);
+        break;
+      case "relationships":
+        const relationshipsResult = lookupRelationships(
+          typeMap,
+          request.typeId,
+        );
+        merged.relationships[request.typeId] = relationshipsResult;
+        merged.metadata.requestOrder.push({
+          type: request.lookup,
+          id: request.typeId,
+        });
+        merged.metadata.relatedTypes.add(request.typeId);
+        // Add related types from relationships
+        Object.values(relationshipsResult.outgoing).forEach((type) =>
+          merged.metadata.relatedTypes.add(type),
+        );
+        Object.values(relationshipsResult.incoming).forEach((type) =>
+          merged.metadata.relatedTypes.add(type),
+        );
+        break;
+      case "search":
+        const searchResult = schemaLookup(
+          schema,
+          request,
+        ) as SearchLookupResponse;
+        merged.searchResults.push(...searchResult.results);
+        merged.metadata.requestOrder.push({
+          type: request.lookup,
+          id: request.query,
+        });
+        break;
+    }
+  }
+
+  return merged;
 }
 
 export default schemaLookup;

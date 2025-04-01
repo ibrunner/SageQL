@@ -133,7 +133,7 @@ export type LookupResponse =
 export const graphQLInputValueSchema = z.object({
   __typename: z.string().optional(),
   name: z.string(),
-  description: z.string().optional(),
+  description: z.union([z.string(), z.null()]).optional(),
   type: z.lazy(() => graphQLTypeSchema),
   defaultValue: z.any().optional(),
 });
@@ -141,7 +141,7 @@ export const graphQLInputValueSchema = z.object({
 export const graphQLEnumValueSchema = z.object({
   __typename: z.string().optional(),
   name: z.string(),
-  description: z.string().optional(),
+  description: z.union([z.string(), z.null()]).optional(),
   isDeprecated: z.boolean().optional(),
   deprecationReason: z.any().optional(),
 });
@@ -149,7 +149,7 @@ export const graphQLEnumValueSchema = z.object({
 export const graphQLFieldSchema = z.object({
   __typename: z.string().optional(),
   name: z.string(),
-  description: z.string().optional(),
+  description: z.union([z.string(), z.null()]).optional(),
   args: z.array(graphQLInputValueSchema).optional().default([]),
   type: z.lazy(() => graphQLTypeSchema),
   isDeprecated: z.boolean().optional(),
@@ -166,7 +166,7 @@ const baseGraphQLTypeSchema = z.object({
   __typename: z.string().optional(),
   kind: z.string(),
   name: z.union([z.string(), z.null()]),
-  description: z.string().optional(),
+  description: z.union([z.string(), z.null()]).optional(),
   fields: z.array(graphQLFieldSchema).nullable().optional(),
   interfaces: z
     .array(z.lazy(() => graphQLTypeSchema))
@@ -196,3 +196,14 @@ export const graphQLSchemaSchema = z.object({
     directives: z.array(z.any()).optional(),
   }),
 });
+
+export interface MergedLookupResponse {
+  types: Record<string, TypeLookupResponse>;
+  fields: Record<string, FieldLookupResponse>;
+  relationships: Record<string, RelationshipsLookupResponse>;
+  searchResults: SearchResult[];
+  metadata: {
+    requestOrder: Array<{ type: LookupType; id: string }>;
+    relatedTypes: Set<string>;
+  };
+}

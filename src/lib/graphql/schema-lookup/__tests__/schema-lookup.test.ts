@@ -1,7 +1,8 @@
 import { z } from "zod";
-import schemaLookup from "../schema-lookup.js";
+import schemaLookup, { schemaListLookup } from "../schema-lookup.js";
 import { testSchema, fullCharacterSchema } from "./mocks/test-schemas.js";
 import schemaCompressor from "../../schema-compressor/schema-compressor.js";
+import { LookupRequest } from "../types.js";
 
 describe("Schema Lookup", () => {
   describe("Schema Validation", () => {
@@ -140,6 +141,249 @@ describe("Schema Lookup", () => {
       expect(compressedEpisodesField.type).toBe("[Episode]!"); // Normalized type notation
     });
   });
+
+  describe("Schema List Lookup", () => {
+    // Sample schema for testing
+    const testSchema = {
+      __schema: {
+        types: [
+          {
+            kind: "OBJECT",
+            name: "User",
+            description: "A user in the system",
+            fields: [
+              {
+                name: "id",
+                type: {
+                  kind: "NON_NULL",
+                  name: null,
+                  ofType: {
+                    kind: "SCALAR",
+                    name: "ID",
+                    description: null,
+                  },
+                },
+              },
+              {
+                name: "posts",
+                type: {
+                  kind: "LIST",
+                  name: null,
+                  ofType: {
+                    kind: "OBJECT",
+                    name: "Post",
+                    description: null,
+                  },
+                },
+              },
+            ],
+          },
+          {
+            kind: "OBJECT",
+            name: "Post",
+            description: "A blog post",
+            fields: [
+              {
+                name: "id",
+                type: {
+                  kind: "NON_NULL",
+                  name: null,
+                  ofType: {
+                    kind: "SCALAR",
+                    name: "ID",
+                    description: null,
+                  },
+                },
+              },
+              {
+                name: "author",
+                type: {
+                  kind: "OBJECT",
+                  name: "User",
+                  description: null,
+                },
+              },
+              {
+                name: "title",
+                type: {
+                  kind: "SCALAR",
+                  name: "String",
+                  description: null,
+                },
+              },
+            ],
+          },
+        ],
+        queryType: { name: "Query" },
+      },
+    };
+
+    it("should handle a single type lookup request", () => {
+      const requests: LookupRequest[] = [{ lookup: "type", id: "User" }];
+
+      const result = schemaListLookup(testSchema, requests);
+
+      expect(result.types).toHaveProperty("User");
+      expect(result.types.User.name).toBe("User");
+      expect(result.types.User.kind).toBe("OBJECT");
+      expect(result.fields).toEqual({});
+      expect(result.relationships).toEqual({});
+      expect(result.searchResults).toEqual([]);
+      expect(result.metadata.requestOrder).toEqual([
+        { type: "type", id: "User" },
+      ]);
+      expect(Array.from(result.metadata.relatedTypes)).toEqual(["User"]);
+    });
+
+    it("should handle multiple type lookups", () => {
+      const requests: LookupRequest[] = [
+        { lookup: "type", id: "User" },
+        { lookup: "type", id: "Post" },
+      ];
+
+      const result = schemaListLookup(testSchema, requests);
+
+      expect(Object.keys(result.types)).toHaveLength(2);
+      expect(result.types).toHaveProperty("User");
+      expect(result.types).toHaveProperty("Post");
+      expect(result.metadata.requestOrder).toHaveLength(2);
+      expect(Array.from(result.metadata.relatedTypes)).toEqual([
+        "User",
+        "Post",
+      ]);
+    });
+
+    it("should handle field lookups", () => {
+      const requests: LookupRequest[] = [
+        { lookup: "field", typeId: "User", fieldId: "posts" },
+        { lookup: "field", typeId: "Post", fieldId: "author" },
+      ];
+
+      const result = schemaListLookup(testSchema, requests);
+
+      // Check that fields exist
+      expect(Object.keys(result.fields)).toContain("User.posts");
+      expect(Object.keys(result.fields)).toContain("Post.author");
+
+      // Check field types
+      expect(result.fields["User.posts"].type.kind).toBe("LIST");
+      expect(result.fields["Post.author"].type.name).toBe("User");
+
+      // Check related types
+      expect(Array.from(result.metadata.relatedTypes)).toContain("User");
+      expect(Array.from(result.metadata.relatedTypes)).toContain("Post");
+    });
+
+    it("should handle relationship lookups", () => {
+      const requests: LookupRequest[] = [
+        { lookup: "relationships", typeId: "User" },
+      ];
+
+      const result = schemaListLookup(testSchema, requests);
+
+      // Check relationships exist
+      expect(Object.keys(result.relationships)).toContain("User");
+
+      // Check outgoing relationships
+      expect(Object.keys(result.relationships.User.outgoing)).toContain(
+        "posts",
+      );
+      expect(result.relationships.User.outgoing["posts"]).toBe("Post");
+
+      // Check incoming relationships
+      expect(Object.keys(result.relationships.User.incoming)).toContain(
+        "Post.author",
+      );
+      expect(result.relationships.User.incoming["Post.author"]).toBe("Post");
+    });
+
+    it("should handle search requests", () => {
+      const requests: LookupRequest[] = [
+        { lookup: "search", query: "user post", limit: 5 },
+      ];
+
+      const result = schemaListLookup(testSchema, requests);
+
+      expect(result.searchResults).toBeInstanceOf(Array);
+      expect(result.searchResults.some((r) => r.path === "User")).toBeTruthy();
+      expect(result.searchResults.some((r) => r.path === "Post")).toBeTruthy();
+    });
+
+    it("should handle mixed request types", () => {
+      const requests: LookupRequest[] = [
+        { lookup: "type", id: "User" },
+        { lookup: "field", typeId: "User", fieldId: "posts" },
+        { lookup: "relationships", typeId: "User" },
+        { lookup: "search", query: "user", limit: 2 },
+      ];
+
+      const result = schemaListLookup(testSchema, requests);
+
+      // Check structure
+      expect(Object.keys(result)).toEqual(
+        expect.arrayContaining([
+          "types",
+          "fields",
+          "relationships",
+          "searchResults",
+          "metadata",
+        ]),
+      );
+
+      // Check types
+      expect(Object.keys(result.types)).toContain("User");
+
+      // Check fields
+      expect(Object.keys(result.fields)).toContain("User.posts");
+
+      // Check relationships
+      expect(Object.keys(result.relationships)).toContain("User");
+
+      // Check search results
+      expect(result.searchResults.length).toBeGreaterThan(0);
+
+      // Check metadata
+      expect(result.metadata.requestOrder).toHaveLength(4);
+      expect(Array.from(result.metadata.relatedTypes)).toContain("User");
+      expect(Array.from(result.metadata.relatedTypes)).toContain("Post");
+    });
+
+    it("should handle duplicate requests by merging them", () => {
+      const requests: LookupRequest[] = [
+        { lookup: "type", id: "User" },
+        { lookup: "type", id: "User" }, // Duplicate
+        { lookup: "field", typeId: "User", fieldId: "posts" },
+        { lookup: "field", typeId: "User", fieldId: "posts" }, // Duplicate
+      ];
+
+      const result = schemaListLookup(testSchema, requests);
+
+      expect(Object.keys(result.types)).toHaveLength(1);
+      expect(Object.keys(result.fields)).toHaveLength(1);
+      // Request order should still maintain all requests
+      expect(result.metadata.requestOrder).toHaveLength(4);
+    });
+
+    it("should throw error for invalid schema", () => {
+      const requests: LookupRequest[] = [{ lookup: "type", id: "User" }];
+
+      expect(() => {
+        schemaListLookup({}, requests);
+      }).toThrow();
+    });
+
+    it("should handle empty request array", () => {
+      const result = schemaListLookup(testSchema, []);
+
+      expect(result.types).toEqual({});
+      expect(result.fields).toEqual({});
+      expect(result.relationships).toEqual({});
+      expect(result.searchResults).toEqual([]);
+      expect(result.metadata.requestOrder).toEqual([]);
+      expect(result.metadata.relatedTypes.size).toBe(0);
+    });
+  });
+
   // describe("Relationships Lookup", () => {
   //   it("should find outgoing and incoming relationships", () => {
   //     const result = schemaLookup(testSchema, {
