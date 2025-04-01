@@ -1,230 +1,40 @@
-import { z } from "zod";
-
-// Types for lookup requests
-export type LookupType =
-  | "type"
-  | "field"
-  | "relationships"
-  | "search"
-  | "pattern";
-
-export interface TypeLookupRequest {
-  lookup: "type";
-  id: string;
-}
-
-export interface FieldLookupRequest {
-  lookup: "field";
-  typeId: string;
-  fieldId: string;
-}
-
-export interface RelationshipsLookupRequest {
-  lookup: "relationships";
-  typeId: string;
-}
-
-export interface SearchLookupRequest {
-  lookup: "search";
-  query: string;
-  limit?: number;
-}
-
-export interface PatternLookupRequest {
-  lookup: "pattern";
-  patternName: string;
-  params: Record<string, string>;
-}
-
-export type LookupRequest =
-  | TypeLookupRequest
-  | FieldLookupRequest
-  | RelationshipsLookupRequest
-  | SearchLookupRequest
-  | PatternLookupRequest;
-
-// Types for schema elements
-export interface SchemaField {
-  name: string;
-  type: string;
-  description?: string;
-  args?: Array<{
-    name: string;
-    type: string;
-    default?: string;
-  }>;
-}
-
-export interface SchemaType {
-  kind: string;
-  name: string;
-  description?: string;
-  fields?: SchemaField[];
-  interfaces?: string[];
-  enumValues?: Array<{
-    name: string;
-    description?: string;
-  }>;
-}
-
-export interface SchemaPattern {
-  fields: Array<{
-    name: string;
-    type: string;
-    description?: string;
-  }>;
-}
-
-export interface CompressedSchema {
-  types: Record<string, SchemaType>;
-  _patterns?: Record<string, SchemaPattern>;
-}
-
-// Types for lookup responses
-export interface TypeLookupResponse {
-  kind: string;
-  name: string;
-  description?: string;
-  fields?: Array<{
-    name: string;
-    type: string;
-    description?: string;
-    args?: Array<{
-      name: string;
-      type: string;
-      default?: string;
-    }>;
-  }>;
-  interfaces?: string[];
-  enumValues?: Array<{
-    name: string;
-    description?: string;
-  }>;
-}
-
-export interface FieldLookupResponse {
-  name: string;
-  type: string;
-  description?: string;
-  args?: Array<{
-    name: string;
-    type: string;
-    default?: string;
-  }>;
-}
-
-export interface RelationshipsLookupResponse {
-  outgoing: Record<string, string>;
-  incoming: Record<string, string>;
-}
-
-export interface SearchResult {
-  path: string;
-  type: string;
-  description?: string;
-  relevance: number;
-}
-
-export interface SearchLookupResponse {
-  results: SearchResult[];
-}
-
-export interface PatternLookupResponse {
-  kind: string;
-  fields: Array<{
-    name: string;
-    type: string;
-    description?: string;
-  }>;
-}
-
-export type LookupResponse =
-  | TypeLookupResponse
-  | FieldLookupResponse
-  | RelationshipsLookupResponse
-  | SearchLookupResponse
-  | PatternLookupResponse;
-
-// Schema validation with Zod
-const schemaFieldSchema = z.object({
-  name: z.string(),
-  type: z.string(),
-  description: z.string().optional(),
-  args: z
-    .array(
-      z.object({
-        name: z.string(),
-        type: z.string(),
-        default: z.string().optional(),
-      }),
-    )
-    .optional(),
-});
-
-const schemaTypeSchema = z.object({
-  kind: z.string(),
-  name: z.string(),
-  description: z.string().optional(),
-  fields: z.array(schemaFieldSchema).optional(),
-  interfaces: z.array(z.string()).optional(),
-  enumValues: z
-    .array(
-      z.object({
-        name: z.string(),
-        description: z.string().optional(),
-      }),
-    )
-    .optional(),
-});
-
-const schemaPatternSchema = z.object({
-  fields: z.array(
-    z.object({
-      name: z.string(),
-      type: z.string(),
-      description: z.string().optional(),
-    }),
-  ),
-});
-
-const compressedSchemaSchema = z.object({
-  types: z.record(schemaTypeSchema),
-  _patterns: z.record(schemaPatternSchema).optional(),
-  queryType: z.string().optional(),
-  mutationType: z.string().optional(),
-  subscriptionType: z.string().optional(),
-  directives: z
-    .array(
-      z.object({
-        name: z.string(),
-        locations: z.array(z.string()).optional(),
-        args: z
-          .array(
-            z.object({
-              name: z.string(),
-              type: z.string(),
-              default: z.string().optional(),
-            }),
-          )
-          .optional(),
-      }),
-    )
-    .optional(),
-});
+import {
+  LookupRequest,
+  LookupResponse,
+  TypeLookupResponse,
+  FieldLookupResponse,
+  RelationshipsLookupResponse,
+  SearchLookupResponse,
+  graphQLSchemaSchema,
+  GraphQLSchema,
+  GraphQLType,
+  SearchResult,
+} from "./types.js";
 
 /**
- * Validates a compressed schema against the expected format
+ * Validates a GraphQL schema against the expected format
  * @param schema The schema to validate
  * @returns The validated schema with proper typing
  * @throws {ZodError} If the schema is invalid
  */
-function validateCompressedSchema(schema: unknown): CompressedSchema {
-  return compressedSchemaSchema.parse(schema);
+function validateSchema(schema: unknown): GraphQLSchema {
+  return graphQLSchemaSchema.parse(schema);
 }
 
 /**
- * Schema lookup function that provides access to compressed schema information
- * @param schema The compressed schema to look up information from
+ * Helper function to get the concrete type name from a GraphQL type
+ * Handles NON_NULL and LIST wrappers
+ */
+function getConcreteTypeName(type: GraphQLType): string {
+  if (type.kind === "NON_NULL" || type.kind === "LIST") {
+    return type.ofType ? getConcreteTypeName(type.ofType) : "";
+  }
+  return type.name || "";
+}
+
+/**
+ * Schema lookup function that provides access to schema information
+ * @param schema The full GraphQL schema to look up information from
  * @param request The lookup request specifying what information to retrieve
  * @returns The requested schema information
  */
@@ -233,22 +43,27 @@ const schemaLookup = (
   request: LookupRequest,
 ): LookupResponse => {
   // Validate schema before use
-  const validatedSchema = validateCompressedSchema(schema);
+  const validatedSchema = validateSchema(schema);
+  const typeMap = new Map(
+    validatedSchema.__schema.types.map((t) => [t.name, t]),
+  );
 
   switch (request.lookup) {
     case "type":
-      return lookupType(validatedSchema, request.id);
+      return lookupType(typeMap, request.id);
     case "field":
-      return lookupField(validatedSchema, request.typeId, request.fieldId);
+      return lookupField(typeMap, request.typeId, request.fieldId);
     case "relationships":
-      return lookupRelationships(validatedSchema, request.typeId);
+      return lookupRelationships(typeMap, request.typeId);
     case "search":
-      return searchSchema(validatedSchema, request.query, request.limit);
+      return searchSchema(
+        validatedSchema.__schema.types,
+        request.query,
+        request.limit,
+      );
     case "pattern":
-      return lookupPattern(
-        validatedSchema,
-        request.patternName,
-        request.params,
+      throw new Error(
+        "Pattern lookup is not supported on full schema - use compressed schema for patterns",
       );
     default:
       throw new Error(`Unsupported lookup type: ${(request as any).lookup}`);
@@ -257,10 +72,10 @@ const schemaLookup = (
 
 // Helper function to look up a type
 function lookupType(
-  schema: CompressedSchema,
+  typeMap: Map<string, GraphQLType>,
   typeId: string,
 ): TypeLookupResponse {
-  const type = schema.types[typeId];
+  const type = typeMap.get(typeId);
   if (!type) {
     throw new Error(`Type not found: ${typeId}`);
   }
@@ -269,16 +84,16 @@ function lookupType(
 
 // Helper function to look up a field
 function lookupField(
-  schema: CompressedSchema,
+  typeMap: Map<string, GraphQLType>,
   typeId: string,
   fieldId: string,
 ): FieldLookupResponse {
-  const type = schema.types[typeId];
+  const type = typeMap.get(typeId);
   if (!type) {
     throw new Error(`Type not found: ${typeId}`);
   }
 
-  const field = type.fields?.find((f: SchemaField) => f.name === fieldId);
+  const field = type.fields?.find((f) => f.name === fieldId);
   if (!field) {
     throw new Error(`Field not found: ${fieldId} on type ${typeId}`);
   }
@@ -288,29 +103,29 @@ function lookupField(
 
 // Helper function to look up relationships
 function lookupRelationships(
-  schema: CompressedSchema,
+  typeMap: Map<string, GraphQLType>,
   typeId: string,
 ): RelationshipsLookupResponse {
   const outgoing: Record<string, string> = {};
   const incoming: Record<string, string> = {};
 
   // Find outgoing relationships (fields on this type that reference other types)
-  const type = schema.types[typeId];
+  const type = typeMap.get(typeId);
   if (type?.fields) {
     for (const field of type.fields) {
-      const fieldType = field.type.replace(/[\[\]!]/g, ""); // Remove [] and ! from type
-      if (schema.types[fieldType]) {
+      const fieldType = getConcreteTypeName(field.type);
+      if (typeMap.has(fieldType) && typeMap.get(fieldType)?.kind === "OBJECT") {
         outgoing[field.name] = fieldType;
       }
     }
   }
 
   // Find incoming relationships (fields on other types that reference this type)
-  for (const [otherTypeId, otherType] of Object.entries(schema.types)) {
-    if (otherTypeId === typeId) continue;
+  for (const [otherTypeId, otherType] of typeMap.entries()) {
+    if (otherTypeId === typeId || otherType.kind !== "OBJECT") continue;
 
     for (const field of otherType.fields || []) {
-      const fieldType = field.type.replace(/[\[\]!]/g, "");
+      const fieldType = getConcreteTypeName(field.type);
       if (fieldType === typeId) {
         incoming[`${otherTypeId}.${field.name}`] = otherTypeId;
       }
@@ -322,7 +137,7 @@ function lookupRelationships(
 
 // Helper function to search the schema
 function searchSchema(
-  schema: CompressedSchema,
+  types: GraphQLType[],
   query: string,
   limit: number = 5,
 ): SearchLookupResponse {
@@ -343,11 +158,13 @@ function searchSchema(
   };
 
   // Search through types
-  for (const [typeId, type] of Object.entries(schema.types)) {
-    const relevance = calculateRelevance(typeId, type.description);
+  for (const type of types) {
+    if (type.name?.startsWith("__")) continue; // Skip introspection types
+
+    const relevance = calculateRelevance(type.name, type.description);
     if (relevance > 0) {
       results.push({
-        path: typeId,
+        path: type.name,
         type: type.kind,
         description: type.description,
         relevance,
@@ -359,8 +176,8 @@ function searchSchema(
       const fieldRelevance = calculateRelevance(field.name, field.description);
       if (fieldRelevance > 0) {
         results.push({
-          path: `${typeId}.${field.name}`,
-          type: field.type,
+          path: `${type.name}.${field.name}`,
+          type: getConcreteTypeName(field.type),
           description: field.description,
           relevance: fieldRelevance,
         });
@@ -371,32 +188,6 @@ function searchSchema(
   // Sort by relevance and limit results
   return {
     results: results.sort((a, b) => b.relevance - a.relevance).slice(0, limit),
-  };
-}
-
-// Helper function to look up and apply a pattern
-function lookupPattern(
-  schema: CompressedSchema,
-  patternName: string,
-  params: Record<string, string>,
-): PatternLookupResponse {
-  const pattern = schema._patterns?.[patternName];
-  if (!pattern) {
-    throw new Error(`Pattern not found: ${patternName}`);
-  }
-
-  // Apply pattern parameters
-  const fields = pattern.fields.map((field) => ({
-    ...field,
-    type: field.type.replace(
-      /\{(\w+)\}/g,
-      (_: string, param: string) => params[param] || param,
-    ),
-  }));
-
-  return {
-    kind: "OBJECT",
-    fields,
   };
 }
 
