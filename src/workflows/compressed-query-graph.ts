@@ -274,25 +274,25 @@ export async function createCompressedQueryGraph(
   const handleValidationErrorNode = async (
     state: CompressedQueryGraphState,
   ) => {
-    logger.debug("\n=== Validation Error Handler ===");
-    logger.debug("Current Query State:", {
+    logger.info("\n=== Validation Error Handler ===");
+    logger.info("Current Query State:", {
       query: state.currentQuery,
       hasQuery: !!state.currentQuery,
       queryLength: state.currentQuery?.length,
     });
-    logger.debug("Validation Errors:", state.validationErrors);
+    logger.info("Validation Errors:", state.validationErrors);
 
     const { validationContext } = formatValidationErrors(
       state.validationErrors,
     );
-    logger.debug("Formatted Validation Context:", validationContext);
+    logger.info("Formatted Validation Context:", validationContext);
 
     const formattedPrompt = await VALIDATION_RETRY_PROMPT.format({
       validationContext,
       failedQuery: state.currentQuery,
       schemaContext: JSON.stringify(state.schemaContext, null, 2),
     });
-    logger.debug("Formatted Retry Prompt:", formattedPrompt);
+    logger.info("Formatted Retry Prompt:", formattedPrompt);
 
     return {
       messages: [...state.messages, getMessageString(formattedPrompt.content)],

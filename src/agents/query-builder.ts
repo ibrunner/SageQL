@@ -115,9 +115,9 @@ export const generateQuery = async (
   schema: any,
   schemaContext?: any,
 ): Promise<QueryGenerationResult> => {
-  logger.debug("\n=== Query Generation Step ===");
-  logger.debug("Request:", request);
-  logger.debug(
+  logger.info("\n=== Query Generation Step ===");
+  logger.info("Request:", request);
+  logger.info(
     "Schema Context:",
     JSON.stringify(
       {

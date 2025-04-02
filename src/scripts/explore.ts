@@ -17,7 +17,7 @@ config();
 function parseArgs() {
   const args = process.argv.slice(2);
   const numQueries = parseInt(
-    args.find((arg) => arg.startsWith("--queries="))?.split("=")[1] || "3",
+    args.find((arg) => arg.startsWith("--queries="))?.split("=")[1] || "1",
   );
 
   if (numQueries < 1) {
