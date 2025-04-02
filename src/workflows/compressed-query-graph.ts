@@ -7,60 +7,57 @@ import { queryValidatorTool } from "../lib/graphql/query-validation-output-parse
 import { QueryValidationOutputParser } from "../lib/graphql/query-validation-output-parser.js";
 import { VALIDATION_RETRY_PROMPT } from "../agents/prompts/retry-validation.js";
 import { EXECUTION_RETRY_PROMPT } from "../agents/prompts/retry-execution.js";
+import {
+  SCHEMA_ANALYSIS_PROMPT,
+  formatErrorContext,
+} from "../agents/prompts/schema-analysis.js";
 import { formatValidationErrors } from "../lib/graphql/error-formatting.js";
 import { logger } from "../lib/logger.js";
 import { getMessageString } from "../lib/get-message-string.js";
-import { Tool } from "@langchain/core/tools";
-import { z } from "zod";
-import { LookupRequest } from "../lib/graphql/schema-lookup/types.js";
+import { analyzeAndLookupSchema } from "../agents/schema-analyzer.js";
+import { llmModel } from "../lib/llm-client.js";
 import { schemaListLookup } from "../lib/graphql/schema-lookup/schema-lookup.js";
+import { LookupRequest } from "../lib/graphql/schema-lookup/types.js";
 
 const MAX_RETRIES = 3;
 
-// Schema lookup tool for use within the workflow
-class SchemaLookupTool extends Tool {
-  name = "schema_lookup";
-  description =
-    "Look up multiple schema items at once. Useful for gathering all necessary schema information before building a query.";
-  schema = z
-    .object({
-      input: z.string().optional(),
-    })
-    .transform((val) => val.input);
-
-  private schemaData: any;
-
-  constructor(schema: any) {
-    super();
-    this.schemaData = schema;
-    logger.debug("Schema Lookup Tool - Initialized with schema:", {
-      hasSchema: !!schema,
-      schemaType: typeof schema,
-    });
-  }
-
-  protected async _call(input: string) {
-    logger.debug("Schema Lookup Tool - Input:", input);
-
-    try {
-      const requests = JSON.parse(input) as LookupRequest[];
-      if (!this.schemaData?.__schema) {
-        throw new Error("Invalid schema: missing __schema property");
-      }
-      const result = schemaListLookup(this.schemaData, requests);
-      logger.debug("Schema Lookup Tool - Result:", {
-        requestCount: requests.length,
-        typesFound: Object.keys(result.types).length,
-        fieldsFound: Object.keys(result.fields).length,
-        relatedTypes: Array.from(result.metadata.relatedTypes),
-      });
-      return JSON.stringify(result);
-    } catch (error) {
-      logger.error("Schema Lookup Tool - Error:", error);
-      throw error;
-    }
-  }
-}
+const schemaLookupFunction = {
+  name: "lookup_schema",
+  description: "Look up schema information based on a list of lookup requests",
+  parameters: {
+    type: "object",
+    properties: {
+      requests: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            lookup: {
+              type: "string",
+              enum: ["type", "field", "relationships"],
+              description: "The type of lookup to perform",
+            },
+            id: {
+              type: "string",
+              description: "The type ID for type lookups",
+            },
+            typeId: {
+              type: "string",
+              description: "The type ID for field and relationship lookups",
+            },
+            fieldId: {
+              type: "string",
+              description: "The field ID for field lookups",
+            },
+          },
+          required: ["lookup"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["requests"],
+  },
+};
 
 // Define state schema with reducers
 const CompressedQueryGraphStateAnnotation = Annotation.Root({
@@ -82,10 +79,29 @@ const CompressedQueryGraphStateAnnotation = Annotation.Root({
   executionResult: Annotation<any>({
     reducer: (x, y) => y || x,
   }),
-  retryCount: Annotation<number>({
+  schemaAnalysisRetries: Annotation<number>({
+    reducer: (x, y) => (y ?? 0) + (x ?? 0),
+  }),
+  queryGenerationRetries: Annotation<number>({
+    reducer: (x, y) => (y ?? 0) + (x ?? 0),
+  }),
+  validationRetries: Annotation<number>({
+    reducer: (x, y) => (y ?? 0) + (x ?? 0),
+  }),
+  executionRetries: Annotation<number>({
     reducer: (x, y) => (y ?? 0) + (x ?? 0),
   }),
   schemaContext: Annotation<any>({
+    reducer: (x, y) => y || x,
+  }),
+  lookupRequests: Annotation<LookupRequest[]>({
+    reducer: (x, y) => y || x,
+  }),
+  lookupResults: Annotation<{
+    success: boolean;
+    context: any;
+    errors: string[];
+  }>({
     reducer: (x, y) => y || x,
   }),
 });
@@ -106,114 +122,319 @@ export async function createCompressedQueryGraph(
   const executor = createGraphQLExecutorTool(apiUrl);
   const validator = queryValidatorTool;
   const validationParser = new QueryValidationOutputParser();
-  const schemaLookup = fullSchema ? new SchemaLookupTool(fullSchema) : null;
 
   // Create the graph
   const workflow = new StateGraph(CompressedQueryGraphStateAnnotation);
 
-  // Schema Context Generation Node
-  const generateSchemaContextNode = async (
-    state: CompressedQueryGraphState,
-  ) => {
-    logger.debug("\n=== Schema Context Generation Step ===");
+  // Schema Analysis Node
+  const analyzeSchemaNode = async (state: CompressedQueryGraphState) => {
+    logger.info("\n=== Schema Analysis Node ===");
+    logger.info("Current State:", {
+      retryCount: state.schemaAnalysisRetries || 0,
+      hasValidationErrors: state.validationErrors?.length > 0,
+      hasSchemaContext: !!state.schemaContext,
+      hasCompressedSchema: !!state.compressedSchema,
+    });
     const userMessage = getMessageString(
       state.messages[state.messages.length - 1],
     );
 
     try {
-      // If we have a schema lookup tool, use it to get context
-      if (schemaLookup) {
-        const schemaRequests: LookupRequest[] = [
-          // Always get the Query type as a starting point
-          { lookup: "type", id: "Query" },
-          // Search for relevant types based on the user's request
-          { lookup: "search", query: userMessage, limit: 5 },
-        ];
+      const chain = SCHEMA_ANALYSIS_PROMPT.pipe(
+        llmModel.bind({
+          functions: [schemaLookupFunction],
+          function_call: { name: "lookup_schema" },
+        }),
+      );
 
-        const schemaContext = await schemaLookup.call(
-          JSON.stringify(schemaRequests),
-        );
-        const parsedContext = JSON.parse(schemaContext);
-        logger.debug(
-          "Generated Schema Context:",
-          JSON.stringify(
-            {
-              typesCount: Object.keys(parsedContext.types || {}).length,
-              fieldsCount: Object.keys(parsedContext.fields || {}).length,
-              relatedTypes: parsedContext.metadata?.relatedTypes || [],
-              types: Object.keys(parsedContext.types || {}),
+      logger.info("Analyzing query:", userMessage);
+      const response = await chain.invoke({
+        userQuery: userMessage,
+        errorContext: formatErrorContext(
+          state.validationErrors?.[0],
+          state.schemaContext
+            ? JSON.stringify(state.schemaContext, null, 2)
+            : undefined,
+        ),
+        tools: [
+          {
+            function: schemaLookupFunction,
+            handler: async (args: { requests: LookupRequest[] }) => {
+              // Store the requests for later use
+              return JSON.stringify({ requests: args.requests });
             },
-            null,
-            2,
-          ),
-        );
+          },
+        ],
+      });
 
-        // Get additional type information for related types
-        if (parsedContext.metadata?.relatedTypes?.length > 0) {
-          const additionalRequests: LookupRequest[] =
-            parsedContext.metadata.relatedTypes.map((type: string) => ({
-              lookup: "type",
-              id: type,
-            }));
-          const additionalContext = await schemaLookup.call(
-            JSON.stringify(additionalRequests),
-          );
-          const parsedAdditional = JSON.parse(additionalContext);
-
-          // Merge the additional type information
-          parsedContext.types = {
-            ...parsedContext.types,
-            ...parsedAdditional.types,
-          };
-
-          logger.debug(
-            "Added Related Types:",
-            JSON.stringify(
-              {
-                additionalTypes: Object.keys(parsedAdditional.types || {}),
-                totalTypes: Object.keys(parsedContext.types || {}).length,
-              },
-              null,
-              2,
-            ),
-          );
-        }
-
-        return {
-          schemaContext: parsedContext,
-          schema: fullSchema,
-          compressedSchema: compressedSchema,
-        };
+      const functionResponse =
+        response.additional_kwargs.function_call?.arguments;
+      if (!functionResponse) {
+        throw new Error("No schema analysis response received");
       }
 
-      // If no schema lookup tool, just use the full schema
-      if (!fullSchema) {
-        throw new Error(
-          "No schema available - either provide a full schema or ensure compressed schema is properly formatted",
-        );
-      }
+      const { requests } = JSON.parse(functionResponse);
+      logger.info("Schema Analysis Results:", {
+        requestCount: requests.length,
+        requestTypes: requests.map((r: any) => r.lookup),
+        requestDetails: requests,
+      });
+
+      logger.info("Schema Analysis Outcome:", {
+        success: true,
+        proceedingToLookup: true,
+        requestsGenerated: requests.length,
+        nextStep: "lookup_schema",
+      });
+
       return {
-        schema: fullSchema,
+        lookupRequests: requests,
       };
     } catch (error) {
-      logger.error("Schema Context Generation Error:", error);
-      // Don't return a schema if schema lookup failed - this should halt the chain
+      logger.error("Schema Analysis Failed:", {
+        error: error instanceof Error ? error.message : String(error),
+        proceedingToRetry: true,
+        nextStep: "handle_schema_analysis_error",
+      });
       return {
         validationErrors: [
-          error instanceof Error
-            ? error.message
-            : "Failed to generate schema context",
+          error instanceof Error ? error.message : "Failed to analyze schema",
         ],
       };
     }
   };
 
+  // Schema Lookup Node
+  const lookupSchemaNode = async (state: CompressedQueryGraphState) => {
+    logger.info("\n=== Schema Lookup Node ===");
+    logger.info("Current State:", {
+      retryCount: state.schemaAnalysisRetries || 0,
+      hasValidationErrors: state.validationErrors?.length > 0,
+      requestCount: state.lookupRequests?.length || 0,
+      hasSchemaContext: !!state.schemaContext,
+      hasCompressedSchema: !!state.compressedSchema,
+    });
+
+    try {
+      logger.info(
+        "Executing Lookup Requests:",
+        JSON.stringify(state.lookupRequests, null, 2),
+      );
+      const schemaContext = schemaListLookup(fullSchema, state.lookupRequests);
+
+      const summary = schemaContext?.metadata?.summary;
+      logger.info(
+        "Schema Lookup Results:",
+        JSON.stringify(
+          {
+            success: summary?.successful === state.lookupRequests.length,
+            hasPartialResults: summary?.hasPartialResults,
+            availableTypes: Object.keys(schemaContext?.types || {}),
+            availableFields: Object.keys(schemaContext?.fields || {}),
+            availableRelationships: Object.keys(
+              schemaContext?.relationships || {},
+            ),
+            metadata: schemaContext?.metadata,
+          },
+          null,
+          2,
+        ),
+      );
+
+      // If we have any errors but also some successes, return both
+      if (summary?.hasPartialResults) {
+        logger.info("Proceeding with Partial Results:", {
+          outcome: "partial_success",
+          successfulLookups: summary.successful,
+          failedLookups: summary.failed,
+          errors: schemaContext.metadata.errors.map((e) => e.error),
+          action:
+            state.schemaAnalysisRetries >= MAX_RETRIES - 1
+              ? "proceeding_to_query"
+              : "retrying",
+          nextStep:
+            state.schemaAnalysisRetries >= MAX_RETRIES - 1
+              ? "generate_query"
+              : "handle_schema_analysis_error",
+          availableSchema: {
+            types: Object.keys(schemaContext?.types || {}),
+            fields: Object.keys(schemaContext?.fields || {}),
+          },
+        });
+        return {
+          schemaContext,
+          schema: fullSchema,
+          compressedSchema: compressedSchema,
+          lookupResults: {
+            success: false,
+            context: schemaContext,
+            errors: schemaContext.metadata.errors.map((e) => e.error),
+          },
+          validationErrors: schemaContext.metadata.errors.map((e) => e.error),
+        };
+      }
+
+      // If everything succeeded
+      if (summary?.successful === state.lookupRequests.length) {
+        logger.info("Schema Lookup Complete:", {
+          outcome: "full_success",
+          successfulLookups: summary.successful,
+          availableTypes: Object.keys(schemaContext?.types || {}),
+          availableFields: Object.keys(schemaContext?.fields || {}),
+          action: "proceeding_to_query",
+          nextStep: "generate_query",
+        });
+        return {
+          schemaContext,
+          schema: fullSchema,
+          compressedSchema: compressedSchema,
+          lookupResults: {
+            success: true,
+            context: schemaContext,
+            errors: [],
+          },
+        };
+      }
+
+      // If everything failed
+      logger.error("Schema Lookup Failed:", {
+        outcome: "complete_failure",
+        failedLookups: summary?.failed,
+        errors: schemaContext.metadata.errors.map((e) => e.error),
+        action:
+          state.schemaAnalysisRetries < MAX_RETRIES ? "retrying" : "ending",
+        nextStep:
+          state.schemaAnalysisRetries < MAX_RETRIES
+            ? "handle_schema_analysis_error"
+            : "END",
+      });
+      return {
+        validationErrors: schemaContext.metadata.errors.map((e) => e.error),
+        lookupResults: {
+          success: false,
+          context: {},
+          errors: schemaContext.metadata.errors.map((e) => e.error),
+        },
+      };
+    } catch (error) {
+      logger.error("Schema Lookup Error:", {
+        error: error instanceof Error ? error.message : String(error),
+        action:
+          state.schemaAnalysisRetries < MAX_RETRIES ? "retrying" : "ending",
+        nextStep:
+          state.schemaAnalysisRetries < MAX_RETRIES
+            ? "handle_schema_analysis_error"
+            : "END",
+      });
+      return {
+        validationErrors: [
+          error instanceof Error
+            ? error.message
+            : "Failed to lookup schema information",
+        ],
+        lookupResults: {
+          success: false,
+          context: {},
+          errors: [error instanceof Error ? error.message : String(error)],
+        },
+      };
+    }
+  };
+
+  // Schema Analysis Retry Node
+  const handleSchemaAnalysisErrorNode = async (
+    state: CompressedQueryGraphState,
+  ) => {
+    logger.info("\n=== Schema Analysis Error Handler ===");
+    logger.info("Retry Status:", {
+      currentRetryCount: state.schemaAnalysisRetries || 0,
+      maxRetries: MAX_RETRIES,
+      remainingRetries: MAX_RETRIES - (state.schemaAnalysisRetries || 0) - 1,
+      hasPartialResults:
+        state.lookupResults?.context &&
+        Object.keys(state.lookupResults.context).length > 0,
+      partialResultsSize: state.lookupResults?.context
+        ? {
+            types: Object.keys(state.lookupResults.context.types || {}).length,
+            fields: Object.keys(state.lookupResults.context.fields || {})
+              .length,
+            relationships: Object.keys(
+              state.lookupResults.context.relationships || {},
+            ).length,
+          }
+        : "none",
+    });
+
+    // If we've hit max retries, preserve any results we have
+    if ((state.schemaAnalysisRetries || 0) + 1 >= MAX_RETRIES) {
+      logger.info("Max retries reached, proceeding with partial results");
+
+      // If we have any results at all, try to proceed with them
+      if (
+        state.lookupResults?.context &&
+        Object.keys(state.lookupResults.context).length > 0
+      ) {
+        logger.info("Proceeding with partial schema context:", {
+          availableTypes: Object.keys(state.lookupResults.context.types || {}),
+          availableFields: Object.keys(
+            state.lookupResults.context.fields || {},
+          ),
+          availableRelationships: Object.keys(
+            state.lookupResults.context.relationships || {},
+          ),
+        });
+        return {
+          schemaAnalysisRetries: MAX_RETRIES,
+          schemaContext: state.lookupResults.context,
+          validationErrors: [], // Clear errors to allow proceeding
+        };
+      }
+
+      // If we have no results at all, we have to end
+      logger.info("No usable results after max retries, ending workflow");
+      return {
+        schemaAnalysisRetries: MAX_RETRIES,
+        validationErrors: [
+          "Failed to gather any schema information after maximum retries",
+        ],
+      };
+    }
+
+    logger.info(
+      `Continuing with retry attempt ${(state.schemaAnalysisRetries || 0) + 1}/${MAX_RETRIES}`,
+    );
+    return {
+      schemaAnalysisRetries: (state.schemaAnalysisRetries || 0) + 1,
+    };
+  };
+
   // Query Generation Node
   const generateQueryNode = async (state: CompressedQueryGraphState) => {
-    logger.debug("\n=== Query Generation Step ===");
+    logger.info("\n=== Query Generation Step ===");
+    logger.info("Current State:", {
+      hasSchemaContext: !!state.schemaContext,
+      hasCompressedSchema: !!state.compressedSchema,
+      availableTypes: state.schemaContext
+        ? Object.keys(state.schemaContext.types || {})
+        : [],
+      availableFields: state.schemaContext
+        ? Object.keys(state.schemaContext.fields || {})
+        : [],
+      availableRelationships: state.schemaContext
+        ? Object.keys(state.schemaContext.relationships || {})
+        : [],
+      retryCount: state.queryGenerationRetries || 0,
+      hasValidationErrors: state.validationErrors?.length > 0,
+    });
 
     // Ensure we have either schema context or compressed schema when using compressed mode
-    if (schemaLookup && !state.schemaContext && !state.compressedSchema) {
+    if (!state.schemaContext && !state.compressedSchema) {
+      logger.error("Query Generation Failed:", {
+        reason: "no_schema_context",
+        error: "No schema context available for query generation",
+        action: "ending",
+        nextStep: "END",
+      });
       return {
         validationErrors: ["No schema context available for query generation"],
       };
@@ -221,16 +442,47 @@ export async function createCompressedQueryGraph(
 
     // Ensure we have a schema for validation
     if (!fullSchema) {
+      logger.error("Query Generation Failed:", {
+        reason: "no_validation_schema",
+        error: "No schema available for validation",
+        action: "ending",
+        nextStep: "END",
+      });
       return {
         validationErrors: ["No schema available for validation"],
       };
     }
 
+    // Use schema context if available, otherwise fall back to compressed schema
+    const schemaToUse = state.schemaContext || state.compressedSchema;
+    logger.info("Query Generation Input:", {
+      schemaType: state.schemaContext ? "dynamic context" : "compressed schema",
+      availableTypes: Object.keys(schemaToUse?.types || {}),
+      availableFields: Object.keys(schemaToUse?.fields || {}),
+      userMessage: getMessageString(state.messages[state.messages.length - 1]),
+      schemaSize: JSON.stringify(schemaToUse).length,
+      hasValidationSchema: !!fullSchema,
+    });
+
     const result = await generateQuery(
       getMessageString(state.messages[state.messages.length - 1]),
       JSON.stringify(fullSchema),
-      state.schemaContext || state.compressedSchema,
+      schemaToUse,
     );
+
+    logger.info("Query Generation Outcome:", {
+      success: !result.errors?.length,
+      hasQuery: !!result.query,
+      queryLength: result.query?.length,
+      errorCount: result.errors?.length || 0,
+      query: result.query || null,
+      errors: result.errors || [],
+      action: result.errors?.length
+        ? "proceeding_to_validation"
+        : "proceeding_to_execution",
+      nextStep: result.errors?.length ? "validate_query" : "execute_query",
+    });
+
     return {
       currentQuery: result.query,
       validationErrors: result.errors || [],
@@ -296,7 +548,7 @@ export async function createCompressedQueryGraph(
 
     return {
       messages: [...state.messages, getMessageString(formattedPrompt.content)],
-      retryCount: 1,
+      validationRetries: (state.validationRetries || 0) + 1,
     };
   };
 
@@ -310,47 +562,163 @@ export async function createCompressedQueryGraph(
 
     return {
       messages: [...state.messages, getMessageString(formattedPrompt.content)],
-      retryCount: 1,
+      executionRetries: (state.executionRetries || 0) + 1,
     };
   };
 
   // Build the graph with chained method calls
   const graph = workflow
-    .addNode("generate_schema_context", generateSchemaContextNode)
+    .addNode("analyze_schema", analyzeSchemaNode)
+    .addNode("lookup_schema", lookupSchemaNode)
     .addNode("generate_query", generateQueryNode)
     .addNode("validate_query", validateQueryNode)
     .addNode("execute_query", executeQueryNode)
     .addNode("handle_validation_error", handleValidationErrorNode)
     .addNode("handle_execution_error", handleExecutionErrorNode)
-    .addEdge(START, "generate_schema_context")
-    .addEdge("generate_schema_context", "generate_query")
+    .addNode("handle_schema_analysis_error", handleSchemaAnalysisErrorNode)
+    .addEdge(START, "analyze_schema")
+    .addConditionalEdges(
+      "analyze_schema",
+      (state: CompressedQueryGraphState) => {
+        const hasErrors = state.validationErrors?.length > 0;
+        const canRetry = (state.schemaAnalysisRetries || 0) < MAX_RETRIES;
+        const hasPartialResults =
+          state.lookupResults?.context &&
+          Object.keys(state.lookupResults.context).length > 0;
+
+        let nextStep;
+        if (hasErrors) {
+          if (canRetry) {
+            nextStep = "handle_schema_analysis_error";
+          } else if (hasPartialResults) {
+            // At max retries but have partial results - proceed to lookup
+            nextStep = "lookup_schema";
+          } else {
+            // At max retries with no results - end
+            nextStep = END;
+          }
+        } else {
+          nextStep = "lookup_schema";
+        }
+
+        logger.info("Schema Analysis State Transition:", {
+          from: "analyze_schema",
+          to: nextStep,
+          hasErrors,
+          retryCount: state.schemaAnalysisRetries || 0,
+          canRetry,
+          hasPartialResults,
+          atMaxRetries: !canRetry,
+          validationErrors: state.validationErrors,
+          availableContext: state.lookupResults?.context
+            ? {
+                types: Object.keys(state.lookupResults.context.types || {}),
+                fields: Object.keys(state.lookupResults.context.fields || {}),
+              }
+            : null,
+        });
+
+        return nextStep;
+      },
+      ["handle_schema_analysis_error", "lookup_schema", END],
+    )
+    .addEdge("handle_schema_analysis_error", "analyze_schema")
     .addEdge("generate_query", "validate_query")
     .addConditionalEdges(
       "validate_query",
       (state: CompressedQueryGraphState) => {
-        if (state.validationErrors.length > 0) {
-          return state.retryCount < MAX_RETRIES
+        const hasErrors = state.validationErrors.length > 0;
+        const canRetry = (state.validationRetries || 0) < MAX_RETRIES;
+        const nextStep = hasErrors
+          ? canRetry
             ? "handle_validation_error"
-            : END;
-        }
-        return "execute_query";
+            : END
+          : "execute_query";
+
+        logger.info("Query Validation State Transition:", {
+          from: "validate_query",
+          to: nextStep,
+          hasErrors,
+          retryCount: state.validationRetries || 0,
+          canRetry,
+          validationErrors: state.validationErrors,
+        });
+
+        return nextStep;
       },
       ["handle_validation_error", "execute_query", END],
     )
     .addConditionalEdges(
       "execute_query",
       (state: CompressedQueryGraphState) => {
-        if (state.validationErrors.length > 0) {
-          return state.retryCount < MAX_RETRIES
+        const hasErrors = state.validationErrors.length > 0;
+        const canRetry = (state.executionRetries || 0) < MAX_RETRIES;
+        const nextStep = hasErrors
+          ? canRetry
             ? "handle_execution_error"
-            : END;
-        }
-        return END;
+            : END
+          : END;
+
+        logger.info("Query Execution State Transition:", {
+          from: "execute_query",
+          to: nextStep,
+          hasErrors,
+          retryCount: state.executionRetries || 0,
+          canRetry,
+          validationErrors: state.validationErrors,
+          hasExecutionResult: !!state.executionResult,
+        });
+
+        return nextStep;
       },
       ["handle_execution_error", END],
     )
-    .addEdge("handle_validation_error", "generate_schema_context")
-    .addEdge("handle_execution_error", "generate_schema_context");
+    .addEdge("handle_validation_error", "analyze_schema")
+    .addEdge("handle_execution_error", "analyze_schema")
+    .addConditionalEdges(
+      "lookup_schema",
+      (state: CompressedQueryGraphState) => {
+        const hasErrors = state.validationErrors?.length > 0;
+        const hasPartialResults =
+          state.lookupResults?.context &&
+          Object.keys(state.lookupResults.context).length > 0;
+        const atMaxRetries =
+          (state.schemaAnalysisRetries || 0) >= MAX_RETRIES - 1;
+        let nextStep;
+
+        if (hasErrors) {
+          if (hasPartialResults && atMaxRetries) {
+            nextStep = "generate_query";
+          } else {
+            nextStep =
+              state.schemaAnalysisRetries < MAX_RETRIES
+                ? "handle_schema_analysis_error"
+                : "generate_query";
+          }
+        } else {
+          nextStep = "generate_query";
+        }
+
+        logger.info("Schema Lookup State Transition:", {
+          from: "lookup_schema",
+          to: nextStep,
+          hasErrors,
+          hasPartialResults,
+          retryCount: state.schemaAnalysisRetries || 0,
+          atMaxRetries,
+          validationErrors: state.validationErrors,
+          availableContext: state.lookupResults?.context
+            ? {
+                types: Object.keys(state.lookupResults.context.types || {}),
+                fields: Object.keys(state.lookupResults.context.fields || {}),
+              }
+            : null,
+        });
+
+        return nextStep;
+      },
+      ["handle_schema_analysis_error", "generate_query", END],
+    );
 
   return graph.compile();
 }

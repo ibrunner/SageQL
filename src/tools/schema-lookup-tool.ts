@@ -1,20 +1,32 @@
 import { Tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { schemaListLookup } from "../lib/graphql/schema-lookup/schema-lookup.js";
-import { LookupRequest } from "../lib/graphql/schema-lookup/types.js";
+import {
+  LookupRequest,
+  GraphQLSchema,
+} from "../lib/graphql/schema-lookup/types.js";
 import { logger } from "../lib/logger.js";
 
+// Define the Zod schema for individual lookup requests
+const lookupRequestSchema = z.discriminatedUnion("lookup", [
+  z.object({
+    lookup: z.literal("type"),
+    id: z.string(),
+  }),
+  z.object({
+    lookup: z.literal("field"),
+    typeId: z.string(),
+    fieldId: z.string(),
+  }),
+  z.object({
+    lookup: z.literal("relationships"),
+    typeId: z.string(),
+  }),
+]);
+
+// Schema for the entire input
 const schemaLookupInputSchema = z.object({
-  requests: z.array(
-    z.object({
-      lookup: z.enum(["type", "field", "relationships", "search"]),
-      id: z.string().optional(),
-      typeId: z.string().optional(),
-      fieldId: z.string().optional(),
-      query: z.string().optional(),
-      limit: z.number().optional(),
-    }),
-  ),
+  requests: z.array(lookupRequestSchema),
 });
 
 export class SchemaLookupTool extends Tool {
@@ -22,27 +34,45 @@ export class SchemaLookupTool extends Tool {
   description =
     "Look up multiple schema items at once. Useful for gathering all necessary schema information before building a query.";
 
-  private schemaData: any;
+  private schemaData: GraphQLSchema;
 
-  constructor(schema: any) {
+  constructor(schema: GraphQLSchema) {
     super();
     this.schemaData = schema;
+    logger.debug("Schema Lookup Tool - Initialized with schema:", {
+      hasSchema: !!schema,
+      schemaType: typeof schema,
+    });
   }
 
-  protected async _call(input: z.infer<typeof schemaLookupInputSchema>) {
+  protected async _call(input: string) {
     logger.debug("Schema Lookup Tool - Input:", input);
 
     try {
+      // Parse and validate the input
+      const parsedInput = JSON.parse(input);
+      const requests = Array.isArray(parsedInput)
+        ? parsedInput
+        : parsedInput.requests;
+
+      // Validate schema
+      if (!this.schemaData?.__schema) {
+        throw new Error("Invalid schema: missing __schema property");
+      }
+
+      // Type assertion here is safe because schemaListLookup will validate the requests
       const result = schemaListLookup(
         this.schemaData,
-        input.requests as LookupRequest[],
+        requests as LookupRequest[],
       );
+
       logger.debug("Schema Lookup Tool - Result:", {
-        requestCount: input.requests.length,
+        requestCount: requests.length,
         typesFound: Object.keys(result.types).length,
         fieldsFound: Object.keys(result.fields).length,
         relatedTypes: Array.from(result.metadata.relatedTypes),
       });
+
       return JSON.stringify(result);
     } catch (error) {
       logger.error("Schema Lookup Tool - Error:", error);
@@ -56,6 +86,6 @@ export class SchemaLookupTool extends Tool {
     })
     .transform((val) => {
       if (!val.input) return undefined;
-      return JSON.parse(val.input);
+      return val.input;
     });
 }

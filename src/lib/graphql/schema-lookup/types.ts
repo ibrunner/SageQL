@@ -214,13 +214,36 @@ export const graphQLSchemaSchema = z
   })
   .passthrough();
 
+export interface RequestMetadata {
+  type: LookupType;
+  id: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface LookupError {
+  request: LookupRequest;
+  error: string;
+}
+
+export interface LookupSummary {
+  total: number;
+  successful: number;
+  failed: number;
+  hasPartialResults: boolean;
+}
+
+export interface LookupMetadata {
+  requestOrder: RequestMetadata[];
+  relatedTypes: Set<string>;
+  errors: LookupError[];
+  summary?: LookupSummary;
+}
+
 export interface MergedLookupResponse {
   types: Record<string, TypeLookupResponse>;
   fields: Record<string, FieldLookupResponse>;
   relationships: Record<string, RelationshipsLookupResponse>;
   searchResults: SearchResult[];
-  metadata: {
-    requestOrder: Array<{ type: LookupType; id: string }>;
-    relatedTypes: Set<string>;
-  };
+  metadata: LookupMetadata;
 }

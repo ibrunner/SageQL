@@ -5,6 +5,7 @@ import {
 } from "@langchain/core/prompts";
 import { BaseMessage, HumanMessage } from "@langchain/core/messages";
 import { GraphQLSchema, parse, validate, buildClientSchema } from "graphql";
+import { jsonrepair } from "jsonrepair";
 import { llmModel } from "../lib/llm-client.js";
 import { QUERY_BUILDER_PROMPT_TEMPLATE } from "./prompts/query-builder.js";
 import { logger } from "../lib/logger.js";
@@ -77,6 +78,16 @@ const validateGraphQLQuery = (
 ): { isValid: boolean; errors?: string[] } => {
   try {
     logger.debug("Attempting to validate query:", query);
+
+    // Try to repair any JSON/GraphQL syntax issues
+    try {
+      query = jsonrepair(query);
+      logger.info("Query repaired:", query);
+    } catch (repairError) {
+      logger.info("Query repair failed:", repairError);
+      // Continue with original query if repair fails
+    }
+
     const ast = parse(query);
     logger.debug("Query parsed successfully to AST");
 

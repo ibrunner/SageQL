@@ -84,8 +84,17 @@ async function main() {
         currentQuery: "",
         validationErrors: [],
         executionResult: null,
-        retryCount: 0,
+        schemaAnalysisRetries: 0,
+        queryGenerationRetries: 0,
+        validationRetries: 0,
+        executionRetries: 0,
         schemaContext: null,
+        lookupRequests: [],
+        lookupResults: {
+          success: false,
+          context: null,
+          errors: [],
+        },
       };
 
       // Run the query graph

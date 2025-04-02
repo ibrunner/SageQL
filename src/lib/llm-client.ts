@@ -18,7 +18,7 @@ export const llmEnv = llmEnvSchema.parse(process.env);
 
 export const llmModel = new ChatOpenAI({
   modelName: llmEnv.OPENAI_MODEL || "gpt-4-turbo-preview",
-  temperature: 0.7,
+  temperature: 1,
   openAIApiKey: llmEnv.OPENAI_API_KEY,
   configuration: {
     baseURL: llmEnv.OPENAI_API_BASE,

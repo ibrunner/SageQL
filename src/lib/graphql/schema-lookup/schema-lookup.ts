@@ -112,24 +112,24 @@ const schemaLookup = (
       });
       return response;
 
-    case "search":
-      response = searchSchema(
-        validatedSchema.__schema.types,
-        request.query,
-        request.limit,
-      );
-      logger.debug("Schema Lookup - Search result:", {
-        query: request.query,
-        limit: request.limit,
-        resultCount: (response as SearchLookupResponse).results.length,
-        topResults: (response as SearchLookupResponse).results
-          .slice(0, 3)
-          .map((r) => ({
-            path: r.path,
-            relevance: r.relevance,
-          })),
-      });
-      return response;
+    // case "search":
+    //   response = searchSchema(
+    //     validatedSchema.__schema.types,
+    //     request.query,
+    //     request.limit,
+    //   );
+    //   logger.debug("Schema Lookup - Search result:", {
+    //     query: request.query,
+    //     limit: request.limit,
+    //     resultCount: (response as SearchLookupResponse).results.length,
+    //     topResults: (response as SearchLookupResponse).results
+    //       .slice(0, 3)
+    //       .map((r) => ({
+    //         path: r.path,
+    //         relevance: r.relevance,
+    //       })),
+    //   });
+    //   return response;
 
     case "pattern":
       throw new Error(
@@ -311,6 +311,21 @@ function searchSchema(
   };
 }
 
+function getRequestId(request: LookupRequest): string {
+  switch (request.lookup) {
+    case "type":
+      return request.id;
+    case "field":
+      return `${request.typeId}.${request.fieldId}`;
+    case "relationships":
+      return request.typeId;
+    case "pattern":
+      return request.patternName;
+    case "search":
+      return request.query;
+  }
+}
+
 export function schemaListLookup(
   schema: unknown,
   requests: LookupRequest[],
@@ -323,8 +338,12 @@ export function schemaListLookup(
     metadata: {
       requestOrder: [],
       relatedTypes: new Set(),
+      errors: [], // Track errors per request
     },
   };
+  logger.info("=== Schema List Lookup ===");
+  logger.info(JSON.stringify(requests, null, 2));
+  logger.info("=== End Schema List Lookup ===");
 
   // Validate schema once for all requests
   const validatedSchema = validateSchema(schema);
@@ -335,64 +354,91 @@ export function schemaListLookup(
   );
 
   for (const request of requests) {
-    switch (request.lookup) {
-      case "type":
-        const typeResult = lookupType(typeMap, request.id);
-        merged.types[request.id] = typeResult;
-        merged.metadata.requestOrder.push({
-          type: request.lookup,
-          id: request.id,
-        });
-        merged.metadata.relatedTypes.add(request.id);
-        break;
-      case "field":
-        const fieldResult = lookupField(
-          typeMap,
-          request.typeId,
-          request.fieldId,
-        );
-        const fieldKey = `${request.typeId}.${request.fieldId}`;
-        merged.fields[fieldKey] = fieldResult;
-        merged.metadata.requestOrder.push({
-          type: request.lookup,
-          id: fieldKey,
-        });
-        merged.metadata.relatedTypes.add(request.typeId);
-        const fieldType = getConcreteTypeName(fieldResult.type);
-        if (fieldType) merged.metadata.relatedTypes.add(fieldType);
-        break;
-      case "relationships":
-        const relationshipsResult = lookupRelationships(
-          typeMap,
-          request.typeId,
-        );
-        merged.relationships[request.typeId] = relationshipsResult;
-        merged.metadata.requestOrder.push({
-          type: request.lookup,
-          id: request.typeId,
-        });
-        merged.metadata.relatedTypes.add(request.typeId);
-        // Add related types from relationships
-        Object.values(relationshipsResult.outgoing).forEach((type) =>
-          merged.metadata.relatedTypes.add(type),
-        );
-        Object.values(relationshipsResult.incoming).forEach((type) =>
-          merged.metadata.relatedTypes.add(type),
-        );
-        break;
-      case "search":
-        const searchResult = schemaLookup(
-          schema,
-          request,
-        ) as SearchLookupResponse;
-        merged.searchResults.push(...searchResult.results);
-        merged.metadata.requestOrder.push({
-          type: request.lookup,
-          id: request.query,
-        });
-        break;
+    try {
+      switch (request.lookup) {
+        case "type":
+          const typeResult = lookupType(typeMap, request.id);
+          merged.types[request.id] = typeResult;
+          merged.metadata.requestOrder.push({
+            type: request.lookup,
+            id: request.id,
+            success: true,
+          });
+          merged.metadata.relatedTypes.add(request.id);
+          break;
+        case "field":
+          const fieldResult = lookupField(
+            typeMap,
+            request.typeId,
+            request.fieldId,
+          );
+          const fieldKey = `${request.typeId}.${request.fieldId}`;
+          merged.fields[fieldKey] = fieldResult;
+          merged.metadata.requestOrder.push({
+            type: request.lookup,
+            id: fieldKey,
+            success: true,
+          });
+          merged.metadata.relatedTypes.add(request.typeId);
+          const fieldType = getConcreteTypeName(fieldResult.type);
+          if (fieldType) merged.metadata.relatedTypes.add(fieldType);
+          break;
+        case "relationships":
+          const relationshipsResult = lookupRelationships(
+            typeMap,
+            request.typeId,
+          );
+          merged.relationships[request.typeId] = relationshipsResult;
+          merged.metadata.requestOrder.push({
+            type: request.lookup,
+            id: request.typeId,
+            success: true,
+          });
+          merged.metadata.relatedTypes.add(request.typeId);
+          // Add related types from relationships
+          Object.values(relationshipsResult.outgoing).forEach((type) =>
+            merged.metadata.relatedTypes.add(type),
+          );
+          Object.values(relationshipsResult.incoming).forEach((type) =>
+            merged.metadata.relatedTypes.add(type),
+          );
+          break;
+      }
+    } catch (error) {
+      logger.error(`Error processing request ${request.lookup}:`, error);
+      // Record the error but continue processing other requests
+      merged.metadata.errors.push({
+        request,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      merged.metadata.requestOrder.push({
+        type: request.lookup,
+        id: getRequestId(request),
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
+
+  // Add success/failure summary to metadata
+  merged.metadata.summary = {
+    total: requests.length,
+    successful: requests.length - merged.metadata.errors.length,
+    failed: merged.metadata.errors.length,
+    hasPartialResults:
+      merged.metadata.errors.length > 0 &&
+      merged.metadata.errors.length < requests.length,
+  };
+
+  logger.info("=== Schema List Lookup Results ===");
+  logger.info("Summary:", merged.metadata.summary);
+  logger.info("Errors:", merged.metadata.errors);
+  logger.info("Results:", {
+    types: Object.keys(merged.types),
+    fields: Object.keys(merged.fields),
+    relationships: Object.keys(merged.relationships),
+  });
+  logger.info("=== End Schema List Lookup ===");
 
   return merged;
 }
