@@ -2,6 +2,9 @@ interface CompressionOptions {
   removeDescriptions?: boolean;
   preserveEssentialDescriptions?: boolean;
   removeDeprecated?: boolean;
+  removeIntrospectionTypes?: boolean;
+  removeEmptyNodes?: boolean;
+  removeCommonScalars?: boolean;
 }
 
 interface GraphQLType {
@@ -35,7 +38,69 @@ const schemaCompressor = (schema: any, options: CompressionOptions = {}) => {
     removeDescriptions = false,
     preserveEssentialDescriptions = true,
     removeDeprecated = true,
+    removeIntrospectionTypes = true,
+    removeEmptyNodes = true,
+    removeCommonScalars = true,
   } = options;
+
+  // Common scalar types that are well-known and don't need documentation
+  const COMMON_SCALAR_TYPES = new Set([
+    "String",
+    "Int",
+    "Float",
+    "Boolean",
+    "ID",
+    // Common extended scalars
+    "Date",
+    "DateTime",
+    "Time",
+    "JSON",
+    "BigInt",
+    "Decimal",
+    "UUID",
+    "URL",
+    "EmailAddress",
+    "PhoneNumber",
+  ]);
+
+  // Helper function to check if a type is a common scalar
+  const isCommonScalar = (type: GraphQLType): boolean => {
+    return (
+      type.kind === "SCALAR" &&
+      type.name !== undefined &&
+      COMMON_SCALAR_TYPES.has(type.name)
+    );
+  };
+
+  // Helper function to check if a value is empty
+  const isEmpty = (value: any): boolean => {
+    if (value === null || value === undefined) return true;
+    if (Array.isArray(value)) return value.length === 0;
+    if (typeof value === "object") return Object.keys(value).length === 0;
+    return false;
+  };
+
+  // Helper function to deeply clean empty nodes
+  const cleanEmptyNodes = (obj: any): any => {
+    if (!removeEmptyNodes) return obj;
+    if (!obj || typeof obj !== "object") return obj;
+
+    if (Array.isArray(obj)) {
+      const cleaned = obj
+        .map((item) => cleanEmptyNodes(item))
+        .filter((item) => !isEmpty(item));
+      return cleaned.length ? cleaned : undefined;
+    }
+
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      const cleanedValue = cleanEmptyNodes(value);
+      if (!isEmpty(cleanedValue)) {
+        cleaned[key] = cleanedValue;
+      }
+    }
+    return Object.keys(cleaned).length ? cleaned : undefined;
+  };
 
   // Helper function to normalize type references into string notation
   const normalizeTypeReference = (typeRef: any): string => {
@@ -48,6 +113,11 @@ const schemaCompressor = (schema: any, options: CompressionOptions = {}) => {
       return `[${normalizeTypeReference(typeRef.ofType)}]`;
     }
     return typeRef.name;
+  };
+
+  // Helper function to check if a type is an introspection type
+  const isIntrospectionType = (typeName: string): boolean => {
+    return typeName.startsWith("__");
   };
 
   // Helper function to compress a single type
@@ -155,17 +225,8 @@ const schemaCompressor = (schema: any, options: CompressionOptions = {}) => {
       }));
     }
 
-    // Remove null or empty array fields
-    Object.keys(compressed).forEach((key) => {
-      if (
-        compressed[key] === null ||
-        (Array.isArray(compressed[key]) && compressed[key].length === 0)
-      ) {
-        delete compressed[key];
-      }
-    });
-
-    return compressed;
+    // Clean empty nodes if enabled
+    return removeEmptyNodes ? cleanEmptyNodes(compressed) : compressed;
   };
 
   // Helper function to compress a directive
@@ -195,7 +256,8 @@ const schemaCompressor = (schema: any, options: CompressionOptions = {}) => {
       compressed.locations = directive.locations;
     }
 
-    return compressed;
+    // Clean empty nodes if enabled
+    return removeEmptyNodes ? cleanEmptyNodes(compressed) : compressed;
   };
 
   // Ensure we have a valid schema with __schema property
@@ -208,8 +270,17 @@ const schemaCompressor = (schema: any, options: CompressionOptions = {}) => {
   // Process all types in the schema
   const compressedTypes = Object.entries(schemaData.types || {}).reduce(
     (acc: any, [_, typeValue]: [string, any]) => {
+      // Skip common scalars if removeCommonScalars is true
+      if (removeCommonScalars && isCommonScalar(typeValue)) {
+        return acc;
+      }
+
       const compressed = compressType(typeValue);
       if (compressed) {
+        // Skip introspection types if removeIntrospectionTypes is true
+        if (removeIntrospectionTypes && isIntrospectionType(compressed.name)) {
+          return acc;
+        }
         acc[compressed.name] = compressed;
       }
       return acc;
@@ -233,17 +304,31 @@ const schemaCompressor = (schema: any, options: CompressionOptions = {}) => {
     types: compressedTypes,
   };
 
-  // Include directives if they exist
+  // Include directives if they exist and aren't introspection directives
   if (
     Array.isArray(schemaData.directives) &&
     schemaData.directives.length > 0
   ) {
     compressedSchema.directives = schemaData.directives
       .map(compressDirective)
-      .filter(Boolean);
+      .filter((directive: GraphQLDirective | null) => {
+        if (!directive) return false;
+        // Remove introspection directives
+        if (removeIntrospectionTypes && isIntrospectionType(directive.name)) {
+          return false;
+        }
+        // Remove @deprecated directive if we're removing deprecated items
+        if (removeDeprecated && directive.name === "deprecated") {
+          return false;
+        }
+        return true;
+      });
   }
 
-  return compressedSchema;
+  // Final cleanup of empty nodes
+  return removeEmptyNodes
+    ? cleanEmptyNodes(compressedSchema)
+    : compressedSchema;
 };
 
 export default schemaCompressor;

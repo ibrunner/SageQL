@@ -33,6 +33,7 @@ async function compressAndSaveSchema() {
       removeDescriptions: false,
       preserveEssentialDescriptions: true,
       removeDeprecated: true,
+      removeIntrospectionTypes: true,
     });
 
     // Create compressed output directory if it doesn't exist
