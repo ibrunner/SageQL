@@ -353,6 +353,25 @@ export function schemaListLookup(
       .map((t) => [t.name, t]),
   );
 
+  // Helper to add a type and its fields to the merged response
+  const addTypeToMerged = (typeName: string) => {
+    if (!merged.types[typeName] && typeMap.has(typeName)) {
+      const type = typeMap.get(typeName)!;
+      merged.types[typeName] = type;
+      merged.metadata.relatedTypes.add(typeName);
+
+      // If this is an object type, also add its fields
+      if (type.kind === "OBJECT" && type.fields) {
+        type.fields.forEach((field) => {
+          const fieldKey = `${typeName}.${field.name}`;
+          if (!merged.fields[fieldKey]) {
+            merged.fields[fieldKey] = field;
+          }
+        });
+      }
+    }
+  };
+
   for (const request of requests) {
     try {
       switch (request.lookup) {
@@ -380,8 +399,20 @@ export function schemaListLookup(
             success: true,
           });
           merged.metadata.relatedTypes.add(request.typeId);
-          const fieldType = getConcreteTypeName(fieldResult.type);
-          if (fieldType) merged.metadata.relatedTypes.add(fieldType);
+
+          // Add the field's return type and its fields to the response
+          const returnTypeName = getConcreteTypeName(fieldResult.type);
+          if (returnTypeName) {
+            addTypeToMerged(returnTypeName);
+            logger.debug("Added return type for field lookup:", {
+              field: fieldKey,
+              returnType: returnTypeName,
+              returnTypeKind: typeMap.get(returnTypeName)?.kind,
+              returnTypeFields: typeMap
+                .get(returnTypeName)
+                ?.fields?.map((f) => f.name),
+            });
+          }
           break;
         case "relationships":
           const relationshipsResult = lookupRelationships(
@@ -395,13 +426,9 @@ export function schemaListLookup(
             success: true,
           });
           merged.metadata.relatedTypes.add(request.typeId);
-          // Add related types from relationships
-          Object.values(relationshipsResult.outgoing).forEach((type) =>
-            merged.metadata.relatedTypes.add(type),
-          );
-          Object.values(relationshipsResult.incoming).forEach((type) =>
-            merged.metadata.relatedTypes.add(type),
-          );
+          // Add related types from relationships and their fields
+          Object.values(relationshipsResult.outgoing).forEach(addTypeToMerged);
+          Object.values(relationshipsResult.incoming).forEach(addTypeToMerged);
           break;
       }
     } catch (error) {

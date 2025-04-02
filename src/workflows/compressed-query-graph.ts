@@ -74,7 +74,7 @@ const CompressedQueryGraphStateAnnotation = Annotation.Root({
     reducer: (x, y) => y || x,
   }),
   validationErrors: Annotation<string[]>({
-    reducer: (x, y) => y || x,
+    reducer: (x, y) => y,
   }),
   executionResult: Annotation<any>({
     reducer: (x, y) => y || x,
@@ -293,6 +293,7 @@ export async function createCompressedQueryGraph(
             context: schemaContext,
             errors: [],
           },
+          validationErrors: [],
         };
       }
 
@@ -483,20 +484,56 @@ export async function createCompressedQueryGraph(
       nextStep: result.errors?.length ? "validate_query" : "execute_query",
     });
 
-    return {
+    const returnState = {
       currentQuery: result.query,
       validationErrors: result.errors || [],
     };
+
+    logger.info("Query Generation Node Exit:", {
+      hasQuery: !!returnState.currentQuery,
+      queryLength: returnState.currentQuery?.length,
+      hasErrors: returnState.validationErrors.length > 0,
+      errors: returnState.validationErrors,
+      nextStep:
+        returnState.validationErrors.length > 0
+          ? "validate_query"
+          : "execute_query",
+    });
+
+    return returnState;
   };
 
   // Query Validation Node
   const validateQueryNode = async (state: CompressedQueryGraphState) => {
-    logger.debug("\n=== Query Validation Step ===");
+    logger.info("\n=== Query Validation Step ===");
+    logger.info("Validation Input:", {
+      query: state.currentQuery,
+      hasQuery: !!state.currentQuery,
+      queryLength: state.currentQuery?.length,
+      hasSchema: !!state.schema,
+      retryCount: state.validationRetries || 0,
+    });
+
     const result = await validator.call({
       query: state.currentQuery,
       schema: JSON.stringify(state.schema),
     });
     const validationResult = await validationParser.parse(result);
+
+    logger.info("Validation Node Exit:", {
+      isValid: !validationResult.errors?.length,
+      hasErrors: (validationResult.errors || []).length > 0,
+      errorCount: validationResult.errors?.length || 0,
+      errors: validationResult.errors || [],
+      retryCount: state.validationRetries || 0,
+      canRetry: (state.validationRetries || 0) < MAX_RETRIES,
+      nextStep:
+        (validationResult.errors || []).length > 0
+          ? (state.validationRetries || 0) < MAX_RETRIES
+            ? "handle_validation_error"
+            : "END"
+          : "execute_query",
+    });
 
     return {
       validationErrors: validationResult.errors || [],
@@ -505,15 +542,53 @@ export async function createCompressedQueryGraph(
 
   // Query Execution Node
   const executeQueryNode = async (state: CompressedQueryGraphState) => {
-    logger.debug("\n=== Query Execution Step ===");
+    logger.info("\n=== Query Execution Step ===");
+    logger.info("Execution Input:", {
+      query: state.currentQuery,
+      hasQuery: !!state.currentQuery,
+      queryLength: state.currentQuery?.length,
+      retryCount: state.executionRetries || 0,
+    });
+
     try {
       const result = await executor.call({
         query: state.currentQuery,
       });
+      const parsedResult = JSON.parse(result);
+
+      logger.info("Query Execution Success:", {
+        hasResult: !!parsedResult,
+        resultSize: JSON.stringify(parsedResult).length,
+        hasData: !!parsedResult.data,
+        hasErrors: !!parsedResult.errors,
+        errors: parsedResult.errors || [],
+        action: "ending",
+        nextStep: "END",
+      });
+
       return {
-        executionResult: JSON.parse(result),
+        executionResult: parsedResult,
+        validationErrors: parsedResult.errors
+          ? [
+              parsedResult.errors
+                .map((e: { message: string }) => e.message)
+                .join(", "),
+            ]
+          : [],
       };
     } catch (error) {
+      logger.error("Query Execution Failed:", {
+        error: error instanceof Error ? error.message : String(error),
+        retryCount: state.executionRetries || 0,
+        canRetry: (state.executionRetries || 0) < MAX_RETRIES,
+        action:
+          (state.executionRetries || 0) < MAX_RETRIES ? "retrying" : "ending",
+        nextStep:
+          (state.executionRetries || 0) < MAX_RETRIES
+            ? "handle_execution_error"
+            : "END",
+      });
+
       return {
         validationErrors: [
           error instanceof Error ? error.message : String(error),
