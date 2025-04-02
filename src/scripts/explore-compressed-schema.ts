@@ -51,9 +51,11 @@ async function main() {
 
     // Create the query graph
     logger.info("\n=== Creating Query Graph ===");
-    const graph = await createCompressedQueryGraph(llmEnv.GRAPHQL_API_URL, {
-      __schema: schemaJson.__schema,
-    });
+    const graph = await createCompressedQueryGraph(
+      llmEnv.GRAPHQL_API_URL,
+      compressedSchema,
+      schemaJson,
+    );
     logger.info("Query graph created successfully");
 
     const explorationPrompt = ChatPromptTemplate.fromMessages([
@@ -68,7 +70,7 @@ async function main() {
       // Generate an interesting query
       const explorationResponse = await llmModel.invoke(
         await explorationPrompt.format({
-          schema: schemaJson,
+          schema: compressedSchema,
           messages: [],
           agent_scratchpad: "",
         }),
@@ -78,6 +80,7 @@ async function main() {
       const initialState: CompressedQueryGraphState = {
         messages: [explorationResponse.content.toString()],
         schema: schemaJson,
+        compressedSchema,
         currentQuery: "",
         validationErrors: [],
         executionResult: null,

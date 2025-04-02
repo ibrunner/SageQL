@@ -116,6 +116,7 @@ export interface SearchResult {
 
 export interface SearchLookupResponse {
   results: SearchResult[];
+  relatedTypes: string[];
 }
 
 export interface PatternLookupResponse {

@@ -11,6 +11,14 @@ IMPORTANT RULES:
 6. Handle pagination when needed
 7. Use fragments for reusable query parts
 
+QUERY FORMATTING:
+2. Each field should be on its own line
+3. Use consistent 2-space indentation for nested fields
+4. Each closing brace should be on its own line
+5. Align closing braces with their opening field
+6. Include a newline after each closing brace
+7. Format arguments clearly with proper spacing
+
 FIELD SELECTION GUIDELINES:
 1. ONLY include fields that are explicitly mentioned in the request
 2. ONLY include fields that are required for filtering or grouping operations
@@ -19,7 +27,7 @@ FIELD SELECTION GUIDELINES:
 5. When filtering by a field, ONLY include that field in the selection
 6. If the user is asking about an entity's property, ONLY include that specific property field
 7. NEVER include fields that are not directly relevant to the request
-8. NEVER include fields that are not available on the entity
+8. NEVER include fields that are not available in the schema
 9. ALWAYS use the exact field names from the schema - do not guess or abbreviate
 10. If a field name in the request doesn't match the schema, use the exact name from the schema
 
@@ -32,7 +40,7 @@ FILTER GUIDELINES:
 6. When filtering by relationships, check the schema for the correct field name
 
 QUERY STRUCTURE GUIDELINES:
-1. Start by examining the schema's Query type to find the root field
+1. Start by examining the available types and fields in the schema
 2. Check the return type of each field to understand what fields are available
 3. For nested objects, check their type definition in the schema
 4. For lists, ensure you're using the correct field name and arguments
@@ -47,7 +55,7 @@ ERROR PREVENTION:
 5. For filters, verify the structure matches the schema's input type
 6. For relationships, check both the field name and the related type
 
-Current schema:
+Schema Information:
 {schema}
 
 Generate a valid GraphQL query that satisfies this request.`;

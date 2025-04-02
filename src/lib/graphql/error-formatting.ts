@@ -33,29 +33,54 @@ export function formatValidationErrors(errors: string[]): ValidationContext {
     {
       template: ERROR_TEMPLATES.fieldName,
       variables: {
-        fieldErrors: fieldNameErrors.map((error) => `- ${error}`).join("\n"),
-        fieldSuggestions: fieldSuggestions.join("\n"),
+        validationContext: "",
+        failedQuery: "",
+        schemaContext: "",
+        fieldErrors:
+          fieldNameErrors.length > 0
+            ? fieldNameErrors.map((error) => `- ${error}`).join("\n")
+            : undefined,
+        fieldSuggestions:
+          fieldSuggestions.length > 0 ? fieldSuggestions.join("\n") : undefined,
       },
       hasErrors: fieldNameErrors.length > 0,
     },
     {
       template: ERROR_TEMPLATES.argument,
       variables: {
-        argumentErrors: argumentErrors.map((error) => `- ${error}`).join("\n"),
+        validationContext: "",
+        failedQuery: "",
+        schemaContext: "",
+        argumentErrors:
+          argumentErrors.length > 0
+            ? argumentErrors.map((error) => `- ${error}`).join("\n")
+            : undefined,
       },
       hasErrors: argumentErrors.length > 0,
     },
     {
       template: ERROR_TEMPLATES.type,
       variables: {
-        typeErrors: typeErrors.map((error) => `- ${error}`).join("\n"),
+        validationContext: "",
+        failedQuery: "",
+        schemaContext: "",
+        typeErrors:
+          typeErrors.length > 0
+            ? typeErrors.map((error) => `- ${error}`).join("\n")
+            : undefined,
       },
       hasErrors: typeErrors.length > 0,
     },
     {
       template: ERROR_TEMPLATES.filter,
       variables: {
-        filterErrors: filterErrors.map((error) => `- ${error}`).join("\n"),
+        validationContext: "",
+        failedQuery: "",
+        schemaContext: "",
+        filterErrors:
+          filterErrors.length > 0
+            ? filterErrors.map((error) => `- ${error}`).join("\n")
+            : undefined,
       },
       hasErrors: filterErrors.length > 0,
     },
@@ -64,13 +89,8 @@ export function formatValidationErrors(errors: string[]): ValidationContext {
   // Build validation context by applying templates
   const validationContext = sections
     .filter((section) => section.hasErrors)
-    .map((section) => {
-      const template = section.template;
-      return Object.entries(section.variables).reduce(
-        (acc, [key, value]) => acc.replace(`{${key}}`, value),
-        template,
-      );
-    })
+    .map((section) => section.template(section.variables))
+    .filter(Boolean)
     .join("\n\n")
     .trim();
 

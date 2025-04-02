@@ -18,6 +18,7 @@ export interface QueryBuilderState {
 
 export interface QueryBuilderConfig {
   model?: ChatOpenAI;
+  schemaContext?: any;
 }
 
 export interface QueryResult {
@@ -25,30 +26,66 @@ export interface QueryResult {
   errors?: string[];
 }
 
+export interface QueryGenerationResult {
+  query?: string;
+  validationErrors?: string[];
+  errors?: string[];
+}
+
+const createQueryBuilderPrompt = () => {
+  return ChatPromptTemplate.fromMessages([
+    ["system", QUERY_BUILDER_PROMPT_TEMPLATE],
+    new MessagesPlaceholder("messages"),
+  ]);
+};
+
 const extractGraphQLQuery = (response: string): string => {
-  // First try to find a code block with graphql language specifier
-  const graphqlBlock = response.match(/```graphql\n([\s\S]*?)```/);
-  if (graphqlBlock) {
-    return graphqlBlock[1].trim();
+  logger.debug("Raw response to extract query from:", response);
+
+  // Extract query from between backticks or curly braces
+  const queryMatch =
+    response.match(/\`([\s\S]*?)\`/) || response.match(/\{([\s\S]*?)\}/);
+  const extractedQuery = queryMatch ? queryMatch[1].trim() : response.trim();
+  logger.debug("Extracted query (before any processing):", extractedQuery);
+
+  // Count opening and closing braces to check if they're balanced
+  const openBraces = (extractedQuery.match(/\{/g) || []).length;
+  const closeBraces = (extractedQuery.match(/\}/g) || []).length;
+  logger.debug("Brace count:", { openBraces, closeBraces });
+
+  // If braces aren't balanced, add missing closing braces
+  let processedQuery = extractedQuery;
+  if (openBraces > closeBraces) {
+    const missingBraces = openBraces - closeBraces;
+    processedQuery = extractedQuery + "\n" + "}".repeat(missingBraces);
+    logger.debug("Added missing closing braces:", missingBraces);
   }
 
-  // Then try to find any code block
-  const codeBlock = response.match(/```\n([\s\S]*?)```/);
-  if (codeBlock) {
-    return codeBlock[1].trim();
+  // Ensure the query starts with 'query' or '{'
+  if (!processedQuery.startsWith("query") && !processedQuery.startsWith("{")) {
+    processedQuery = `query {\n${processedQuery}\n}`;
+    logger.debug("Query wrapped with query keyword");
   }
 
-  // If no code blocks found, return the entire response trimmed
-  return response.trim();
+  logger.debug("Final processed query:", processedQuery);
+  return processedQuery;
 };
 
 const validateGraphQLQuery = (
   query: string,
-  schema: GraphQLSchema,
+  schema: any,
 ): { isValid: boolean; errors?: string[] } => {
   try {
+    logger.debug("Attempting to validate query:", query);
     const ast = parse(query);
-    const validationErrors = validate(schema, ast);
+    logger.debug("Query parsed successfully to AST");
+
+    // Build the schema from the introspection result
+    const parsedSchema = buildClientSchema(JSON.parse(schema));
+    logger.debug("Schema built successfully");
+
+    const validationErrors = validate(parsedSchema, ast);
+    logger.debug("Validation complete, errors:", validationErrors);
 
     if (validationErrors.length > 0) {
       return {
@@ -59,6 +96,11 @@ const validateGraphQLQuery = (
 
     return { isValid: true };
   } catch (error) {
+    logger.error("Query Validation Error:", {
+      error,
+      query,
+      schemaAvailable: !!schema,
+    });
     return {
       isValid: false,
       errors: [
@@ -68,55 +110,70 @@ const validateGraphQLQuery = (
   }
 };
 
-export const createQueryBuilderPrompt = () => {
-  return ChatPromptTemplate.fromMessages([
-    ["system", QUERY_BUILDER_PROMPT_TEMPLATE],
-    new MessagesPlaceholder("messages"),
-  ]);
-};
-
 export const generateQuery = async (
   request: string,
-  schema: string,
-  config: QueryBuilderConfig = {},
-): Promise<QueryResult> => {
-  const { model = llmModel } = config;
-  const prompt = createQueryBuilderPrompt();
-
-  logger.debug("\n=== Generating Query ===");
+  schema: any,
+  schemaContext?: any,
+): Promise<QueryGenerationResult> => {
+  logger.debug("\n=== Query Generation Step ===");
   logger.debug("Request:", request);
-  logger.debug("Schema:", schema);
-
-  // Format the prompt
-  logger.debug("\n=== Invoking Model ===");
-  const formattedPrompt = await prompt.format({
-    schema,
-    messages: [new HumanMessage(request)],
-  });
-  logger.debug("Formatted prompt:", formattedPrompt);
-
-  // Get response from model
-  const response = await model.invoke(formattedPrompt);
-  logger.debug("Model execution completed");
-  logger.debug("Raw response:", response);
-
-  // Extract the query from the response
-  const extractedQuery = extractGraphQLQuery(
-    typeof response.content === "string"
-      ? response.content
-      : JSON.stringify(response.content),
+  logger.debug(
+    "Schema Context:",
+    JSON.stringify(
+      {
+        types: schemaContext ? Object.keys(schemaContext.types || {}) : [],
+        fields: schemaContext ? Object.keys(schemaContext.fields || {}) : [],
+        metadata: schemaContext?.metadata || {},
+      },
+      null,
+      2,
+    ),
   );
-  logger.debug("Extracted query:", extractedQuery);
 
-  // Parse the schema for validation
-  const parsedSchema = buildClientSchema(JSON.parse(schema));
+  try {
+    const prompt = createQueryBuilderPrompt();
+    const formattedPrompt = await prompt.format({
+      schema: schemaContext ? JSON.stringify(schemaContext, null, 2) : schema,
+      messages: [new HumanMessage(request)],
+    });
+    logger.debug("Formatted Prompt:", formattedPrompt);
 
-  // Validate the extracted query
-  const validation = validateGraphQLQuery(extractedQuery, parsedSchema);
-  logger.debug("Validation result:", validation);
+    const response = await llmModel.invoke(formattedPrompt);
+    logger.debug("Model Response:", response);
 
-  return {
-    query: extractedQuery,
-    errors: validation.errors,
-  };
+    const query = extractGraphQLQuery(
+      typeof response.content === "string"
+        ? response.content
+        : JSON.stringify(response.content),
+    );
+    if (!query) {
+      logger.error("No GraphQL query found in response");
+      return {
+        validationErrors: ["No GraphQL query found in response"],
+      };
+    }
+    logger.debug("Extracted Query:", query);
+
+    const validationResult = validateGraphQLQuery(query, schema);
+    if (!validationResult.isValid) {
+      logger.error("Query Validation Failed:", {
+        errors: validationResult.errors,
+        query,
+      });
+      return {
+        query,
+        validationErrors: validationResult.errors,
+      };
+    }
+
+    logger.debug("Query Validation Passed");
+    return { query };
+  } catch (error) {
+    logger.error("Query Generation Error:", error);
+    return {
+      validationErrors: [
+        error instanceof Error ? error.message : "Failed to generate query",
+      ],
+    };
+  }
 };

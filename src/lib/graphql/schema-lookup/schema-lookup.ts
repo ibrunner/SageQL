@@ -12,6 +12,7 @@ import {
   LookupType,
   MergedLookupResponse,
 } from "./types.js";
+import { logger } from "../../logger.js";
 
 /**
  * Validates a GraphQL schema against the expected format
@@ -20,7 +21,21 @@ import {
  * @throws {ZodError} If the schema is invalid
  */
 function validateSchema(schema: unknown): GraphQLSchema {
-  return graphQLSchemaSchema.parse(schema);
+  logger.debug("Schema Validation - Input schema structure:", {
+    hasSchema: !!schema,
+    schemaType: typeof schema,
+    hasIntrospection: !!(schema as any)?.__schema,
+    typeCount: (schema as any)?.__schema?.types?.length,
+  });
+
+  const validated = graphQLSchemaSchema.parse(schema);
+  logger.debug("Schema Validation - Validated schema:", {
+    typeCount: validated.__schema.types.length,
+    queryType: validated.__schema.queryType?.name,
+    types: validated.__schema.types.map((t) => t.name),
+  });
+
+  return validated;
 }
 
 /**
@@ -44,6 +59,11 @@ const schemaLookup = (
   schema: unknown,
   request: LookupRequest,
 ): LookupResponse => {
+  logger.debug("Schema Lookup - Processing request:", {
+    requestType: request.lookup,
+    requestDetails: request,
+  });
+
   // Validate schema before use
   const validatedSchema = validateSchema(schema);
   const typeMap = new Map(
@@ -52,19 +72,65 @@ const schemaLookup = (
       .map((t) => [t.name, t]),
   );
 
+  logger.debug("Schema Lookup - Type map created:", {
+    typeCount: typeMap.size,
+    availableTypes: Array.from(typeMap.keys()),
+  });
+
+  let response: LookupResponse;
   switch (request.lookup) {
     case "type":
-      return lookupType(typeMap, request.id);
+      response = lookupType(typeMap, request.id);
+      logger.debug("Schema Lookup - Type lookup result:", {
+        requestedType: request.id,
+        found: !!response,
+        typeKind: (response as TypeLookupResponse)?.kind,
+        fieldCount: (response as TypeLookupResponse)?.fields?.length,
+      });
+      return response;
+
     case "field":
-      return lookupField(typeMap, request.typeId, request.fieldId);
+      response = lookupField(typeMap, request.typeId, request.fieldId);
+      logger.debug("Schema Lookup - Field lookup result:", {
+        type: request.typeId,
+        field: request.fieldId,
+        found: !!response,
+        fieldType: (response as FieldLookupResponse)?.type?.name,
+      });
+      return response;
+
     case "relationships":
-      return lookupRelationships(typeMap, request.typeId);
+      response = lookupRelationships(typeMap, request.typeId);
+      logger.debug("Schema Lookup - Relationships lookup result:", {
+        type: request.typeId,
+        outgoingCount: Object.keys(
+          (response as RelationshipsLookupResponse).outgoing,
+        ).length,
+        incomingCount: Object.keys(
+          (response as RelationshipsLookupResponse).incoming,
+        ).length,
+      });
+      return response;
+
     case "search":
-      return searchSchema(
+      response = searchSchema(
         validatedSchema.__schema.types,
         request.query,
         request.limit,
       );
+      logger.debug("Schema Lookup - Search result:", {
+        query: request.query,
+        limit: request.limit,
+        resultCount: (response as SearchLookupResponse).results.length,
+        topResults: (response as SearchLookupResponse).results
+          .slice(0, 3)
+          .map((r) => ({
+            path: r.path,
+            relevance: r.relevance,
+          })),
+      });
+      return response;
+
     case "pattern":
       throw new Error(
         "Pattern lookup is not supported on full schema - use compressed schema for patterns",
@@ -145,8 +211,15 @@ function searchSchema(
   query: string,
   limit: number = 5,
 ): SearchLookupResponse {
+  logger.debug("Schema Search - Processing query:", {
+    query,
+    limit,
+    typeCount: types.length,
+  });
+
   const results: SearchResult[] = [];
   const searchTerms = query.toLowerCase().split(" ");
+  const relatedTypes = new Set<string>();
 
   // Helper to calculate relevance score
   const calculateRelevance = (text: string, description?: string): number => {
@@ -173,25 +246,68 @@ function searchSchema(
         description: type.description,
         relevance,
       });
+      relatedTypes.add(type.name);
+
+      // If this is an object type, also add its fields
+      if (type.kind === "OBJECT" && type.fields) {
+        for (const field of type.fields) {
+          const fieldRelevance = calculateRelevance(
+            field.name,
+            field.description,
+          );
+          if (fieldRelevance > 0) {
+            results.push({
+              path: `${type.name}.${field.name}`,
+              type: getConcreteTypeName(field.type),
+              description: field.description,
+              relevance: fieldRelevance,
+            });
+            relatedTypes.add(type.name);
+            relatedTypes.add(getConcreteTypeName(field.type));
+          }
+        }
+      }
     }
 
-    // Search through fields
-    for (const field of type.fields || []) {
-      const fieldRelevance = calculateRelevance(field.name, field.description);
-      if (fieldRelevance > 0) {
-        results.push({
-          path: `${type.name}.${field.name}`,
-          type: getConcreteTypeName(field.type),
-          description: field.description,
-          relevance: fieldRelevance,
-        });
+    // Search through fields even if type itself isn't relevant
+    if (type.kind === "OBJECT" && type.fields) {
+      for (const field of type.fields) {
+        const fieldRelevance = calculateRelevance(
+          field.name,
+          field.description,
+        );
+        if (fieldRelevance > 0) {
+          results.push({
+            path: `${type.name}.${field.name}`,
+            type: getConcreteTypeName(field.type),
+            description: field.description,
+            relevance: fieldRelevance,
+          });
+          relatedTypes.add(type.name);
+          relatedTypes.add(getConcreteTypeName(field.type));
+        }
       }
     }
   }
 
   // Sort by relevance and limit results
+  const sortedResults = results
+    .sort((a, b) => b.relevance - a.relevance)
+    .slice(0, limit);
+
+  logger.debug("Schema Search - Results:", {
+    query,
+    resultCount: sortedResults.length,
+    relatedTypes: Array.from(relatedTypes),
+    topResults: sortedResults.slice(0, 3).map((r) => ({
+      path: r.path,
+      relevance: r.relevance,
+    })),
+  });
+
   return {
-    results: results.sort((a, b) => b.relevance - a.relevance).slice(0, limit),
+    results: sortedResults,
+    relatedTypes: Array.from(relatedTypes),
   };
 }
 

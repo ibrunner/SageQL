@@ -70,6 +70,9 @@ const CompressedQueryGraphStateAnnotation = Annotation.Root({
   schema: Annotation<any>({
     reducer: (x, y) => y || x,
   }),
+  compressedSchema: Annotation<any>({
+    reducer: (x, y) => y || x,
+  }),
   currentQuery: Annotation<string>({
     reducer: (x, y) => y || x,
   }),
@@ -96,13 +99,14 @@ export type CompressedQueryGraphState =
  */
 export async function createCompressedQueryGraph(
   apiUrl: string,
-  compressedSchema: any,
+  compressedSchema?: any,
+  fullSchema?: any,
 ) {
   // Initialize tools
   const executor = createGraphQLExecutorTool(apiUrl);
   const validator = queryValidatorTool;
   const validationParser = new QueryValidationOutputParser();
-  const schemaLookup = new SchemaLookupTool(compressedSchema);
+  const schemaLookup = fullSchema ? new SchemaLookupTool(fullSchema) : null;
 
   // Create the graph
   const workflow = new StateGraph(CompressedQueryGraphStateAnnotation);
@@ -117,28 +121,83 @@ export async function createCompressedQueryGraph(
     );
 
     try {
-      // Analyze the user's request to determine what schema information we need
-      const schemaRequests: LookupRequest[] = [
-        // Always get the Query type as a starting point
-        { lookup: "type", id: "Query" },
-        // Search for relevant types based on the user's request
-        { lookup: "search", query: userMessage, limit: 5 },
-      ];
+      // If we have a schema lookup tool, use it to get context
+      if (schemaLookup) {
+        const schemaRequests: LookupRequest[] = [
+          // Always get the Query type as a starting point
+          { lookup: "type", id: "Query" },
+          // Search for relevant types based on the user's request
+          { lookup: "search", query: userMessage, limit: 5 },
+        ];
 
-      const schemaContext = await schemaLookup.call(
-        JSON.stringify(schemaRequests),
-      );
-      const parsedContext = JSON.parse(schemaContext);
-      logger.debug("Generated Schema Context:", {
-        typesCount: Object.keys(parsedContext.types || {}).length,
-        fieldsCount: Object.keys(parsedContext.fields || {}).length,
-      });
+        const schemaContext = await schemaLookup.call(
+          JSON.stringify(schemaRequests),
+        );
+        const parsedContext = JSON.parse(schemaContext);
+        logger.debug(
+          "Generated Schema Context:",
+          JSON.stringify(
+            {
+              typesCount: Object.keys(parsedContext.types || {}).length,
+              fieldsCount: Object.keys(parsedContext.fields || {}).length,
+              relatedTypes: parsedContext.metadata?.relatedTypes || [],
+              types: Object.keys(parsedContext.types || {}),
+            },
+            null,
+            2,
+          ),
+        );
 
+        // Get additional type information for related types
+        if (parsedContext.metadata?.relatedTypes?.length > 0) {
+          const additionalRequests: LookupRequest[] =
+            parsedContext.metadata.relatedTypes.map((type: string) => ({
+              lookup: "type",
+              id: type,
+            }));
+          const additionalContext = await schemaLookup.call(
+            JSON.stringify(additionalRequests),
+          );
+          const parsedAdditional = JSON.parse(additionalContext);
+
+          // Merge the additional type information
+          parsedContext.types = {
+            ...parsedContext.types,
+            ...parsedAdditional.types,
+          };
+
+          logger.debug(
+            "Added Related Types:",
+            JSON.stringify(
+              {
+                additionalTypes: Object.keys(parsedAdditional.types || {}),
+                totalTypes: Object.keys(parsedContext.types || {}).length,
+              },
+              null,
+              2,
+            ),
+          );
+        }
+
+        return {
+          schemaContext: parsedContext,
+          schema: fullSchema,
+          compressedSchema: compressedSchema,
+        };
+      }
+
+      // If no schema lookup tool, just use the full schema
+      if (!fullSchema) {
+        throw new Error(
+          "No schema available - either provide a full schema or ensure compressed schema is properly formatted",
+        );
+      }
       return {
-        schemaContext: parsedContext,
+        schema: fullSchema,
       };
     } catch (error) {
       logger.error("Schema Context Generation Error:", error);
+      // Don't return a schema if schema lookup failed - this should halt the chain
       return {
         validationErrors: [
           error instanceof Error
@@ -152,10 +211,25 @@ export async function createCompressedQueryGraph(
   // Query Generation Node
   const generateQueryNode = async (state: CompressedQueryGraphState) => {
     logger.debug("\n=== Query Generation Step ===");
+
+    // Ensure we have either schema context or compressed schema when using compressed mode
+    if (schemaLookup && !state.schemaContext && !state.compressedSchema) {
+      return {
+        validationErrors: ["No schema context available for query generation"],
+      };
+    }
+
+    // Ensure we have a schema for validation
+    if (!fullSchema) {
+      return {
+        validationErrors: ["No schema available for validation"],
+      };
+    }
+
     const result = await generateQuery(
       getMessageString(state.messages[state.messages.length - 1]),
-      JSON.stringify(state.schema),
-      state.schemaContext,
+      JSON.stringify(fullSchema),
+      state.schemaContext || state.compressedSchema,
     );
     return {
       currentQuery: result.query,
@@ -200,14 +274,25 @@ export async function createCompressedQueryGraph(
   const handleValidationErrorNode = async (
     state: CompressedQueryGraphState,
   ) => {
+    logger.debug("\n=== Validation Error Handler ===");
+    logger.debug("Current Query State:", {
+      query: state.currentQuery,
+      hasQuery: !!state.currentQuery,
+      queryLength: state.currentQuery?.length,
+    });
+    logger.debug("Validation Errors:", state.validationErrors);
+
     const { validationContext } = formatValidationErrors(
       state.validationErrors,
     );
+    logger.debug("Formatted Validation Context:", validationContext);
+
     const formattedPrompt = await VALIDATION_RETRY_PROMPT.format({
       validationContext,
       failedQuery: state.currentQuery,
       schemaContext: JSON.stringify(state.schemaContext, null, 2),
     });
+    logger.debug("Formatted Retry Prompt:", formattedPrompt);
 
     return {
       messages: [...state.messages, getMessageString(formattedPrompt.content)],
