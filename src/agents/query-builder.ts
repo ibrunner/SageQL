@@ -84,7 +84,13 @@ const validateGraphQLQuery = (
       query = jsonrepair(query);
       logger.info("Query repaired:", query);
     } catch (repairError) {
-      logger.info("Query repair failed:", repairError);
+      logger.info("Query repair failed:", {
+        error:
+          repairError instanceof Error
+            ? repairError.message
+            : String(repairError),
+        rawQuery: query,
+      });
       // Continue with original query if repair fails
     }
 
